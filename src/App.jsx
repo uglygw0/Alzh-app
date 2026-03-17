@@ -361,28 +361,32 @@ function App() {
       )}
 
       {stage === 'select-mode' && (
-        <div className="center-content fade-in">
-          <button className="back-btn" onClick={() => setStage('home')}>← 이전 화면</button>
-          <div className="header-icon" style={{ marginTop: '20px' }}>🧠</div>
-          <h1>기억력 튼튼 테스트</h1>
-          <p style={{ marginBottom: '40px', fontSize: '24px' }}>
-            원하시는 검사 방식을 화면에서 <strong>크게</strong> 눌러주세요.
-          </p>
-          
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '24px', width: '100%' }}>
-            <div className="mode-card" onClick={() => handleSelectMode('typing')}>
-              <div className="mode-icon">⌨️</div>
-              <div className="mode-info">
-                <h3>글씨 직접 치기</h3>
-                <p>화면에 나오는 글자를 키보드로 따라 칩니다.</p>
-              </div>
-            </div>
+        <div className="fade-in" style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+          <div style={{ width: '100%' }}>
+            <button className="back-btn" onClick={() => setStage('home')}>← 이전 화면</button>
+          </div>
+          <div className="center-content" style={{ flex: 1, justifyContent: 'flex-start', paddingTop: '10px' }}>
+            <div className="header-icon">🧠</div>
+            <h1>기억력 튼튼 테스트</h1>
+            <p style={{ marginBottom: '40px', fontSize: '24px' }}>
+              원하시는 검사 방식을 화면에서 <strong>크게</strong> 눌러주세요.
+            </p>
             
-            <div className="mode-card" onClick={() => handleSelectMode('voice')}>
-              <div className="mode-icon">🎙️</div>
-              <div className="mode-info">
-                <h3>목소리로 읽기</h3>
-                <p>화면에 나오는 글자를 소리내어 또박또박 읽습니다.</p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '24px', width: '100%' }}>
+              <div className="mode-card" onClick={() => handleSelectMode('typing')}>
+                <div className="mode-icon">⌨️</div>
+                <div className="mode-info">
+                  <h3>글씨 직접 치기</h3>
+                  <p>화면에 나오는 글자를 키보드로 따라 칩니다.</p>
+                </div>
+              </div>
+              
+              <div className="mode-card" onClick={() => handleSelectMode('voice')}>
+                <div className="mode-icon">🎙️</div>
+                <div className="mode-info">
+                  <h3>목소리로 읽기</h3>
+                  <p>화면에 나오는 글자를 소리내어 또박또박 읽습니다.</p>
+                </div>
               </div>
             </div>
           </div>
@@ -391,38 +395,46 @@ function App() {
 
       {/* Typing Intro */}
       {stage === 'typing-intro' && (
-        <div className="center-content fade-in">
-          <button className="back-btn" onClick={() => setStage('select-mode')}>← 처음으로</button>
-          <div className="header-icon">⌨️</div>
-          <h1>글씨 직접 치기</h1>
-          <div className="solid-card" style={{ marginBottom: '40px', textAlign: 'center' }}>
-            <p style={{ fontSize: '24px', fontWeight: 'bold' }}>
-              안내 문구를 보시고 똑같이 <br/>키보드로 쳐주시면 됩니다.<br/><br/>
-              천천히, 편안하게<br/>진행해 보세요.
-            </p>
+        <div className="fade-in" style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+          <div style={{ width: '100%' }}>
+            <button className="back-btn" onClick={() => setStage('select-mode')}>← 이전 화면</button>
           </div>
-          <button className="btn" onClick={handleStartTest}>시작하기</button>
+          <div className="center-content" style={{ flex: 1, justifyContent: 'flex-start', paddingTop: '10px' }}>
+            <div className="header-icon">⌨️</div>
+            <h1>글씨 직접 치기</h1>
+            <div className="solid-card" style={{ marginBottom: '40px', textAlign: 'center' }}>
+              <p style={{ fontSize: '24px', fontWeight: 'bold' }}>
+                안내 문구를 보시고 똑같이 <br/>키보드로 쳐주시면 됩니다.<br/><br/>
+                천천히, 편안하게<br/>진행해 보세요.
+              </p>
+            </div>
+            <button className="btn" onClick={handleStartTest}>시작하기</button>
+          </div>
         </div>
       )}
 
       {/* Voice Intro */}
       {stage === 'voice-intro' && (
-        <div className="center-content fade-in">
-          <button className="back-btn" onClick={() => setStage('select-mode')}>← 처음으로</button>
-          <div className="header-icon">🎙️</div>
-          <h1>목소리로 읽기</h1>
-          <div className="solid-card" style={{ marginBottom: '40px', textAlign: 'center' }}>
-            <p style={{ fontSize: '24px', fontWeight: 'bold' }}>
-              마이크에 대고<br/>화면에 나오는 글자를<br/>소리 내어 또박또박 읽어주세요.
-            </p>
+        <div className="fade-in" style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+          <div style={{ width: '100%' }}>
+            <button className="back-btn" onClick={() => setStage('select-mode')}>← 이전 화면</button>
           </div>
-          {!voiceSupport ? (
-            <div className="error-box">
-              해당 기기에서는 마이크 기능을 쓸 수 없습니다.<br/><br/>[처음으로] 버튼을 눌러 [글씨 직접 치기]를 이용해 주세요.
+          <div className="center-content" style={{ flex: 1, justifyContent: 'flex-start', paddingTop: '10px' }}>
+            <div className="header-icon">🎙️</div>
+            <h1>목소리로 읽기</h1>
+            <div className="solid-card" style={{ marginBottom: '40px', textAlign: 'center' }}>
+              <p style={{ fontSize: '24px', fontWeight: 'bold' }}>
+                마이크에 대고<br/>화면에 나오는 글자를<br/>소리 내어 또박또박 읽어주세요.
+              </p>
             </div>
-          ) : (
-            <button className="btn" onClick={handleStartTest}>시작하기</button>
-          )}
+            {!voiceSupport ? (
+              <div className="error-box">
+                해당 기기에서는 마이크 기능을 쓸 수 없습니다.<br/><br/>[처음으로] 버튼을 눌러 [글씨 직접 치기]를 이용해 주세요.
+              </div>
+            ) : (
+              <button className="btn" onClick={handleStartTest}>시작하기</button>
+            )}
+          </div>
         </div>
       )}
 
