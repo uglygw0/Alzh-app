@@ -205,18 +205,18 @@ function App() {
       const timeInMinutes = Math.max(0.1, totalTime / 60);
       const cpm = Math.round(estimatedStrokes / timeInMinutes);
 
-      let rating = "양호함";
-      let message = "현재 아주 건강한 인지 능력을 보여주고 계십니다. 꾸준한 두뇌 활동으로 건강을 유지하세요!";
+      let rating = "건강합니다";
+      let message = "현재 아주 건강한 인지 능력을 보여주고 계십니다. 꾸준한 두뇌 활동으로 늘 건강을 유지하세요!";
       if (accuracy < 85 || cpm < 100) {
-        rating = "주의 필요";
-        message = "주의 집중력이나 타이핑 속도가 다소 떨어졌을 수 있습니다. 꾸준한 연습을 통해 개선해 보세요.";
+        rating = "주의가 필요합니다";
+        message = "집중력이나 속도가 다소 떨어졌을 수 있습니다. 편안한 마음으로 화면을 보고 다시 한번 연습해 보세요.";
       }
 
       return (
         <React.Fragment>
-          <div className="glass-card" style={{ textAlign: 'center', backgroundColor: rating === '주의 필요' ? '#FEF2F2' : 'var(--primary-light)' }}>
-            <h2 style={{ color: rating === '주의 필요' ? 'var(--danger)' : 'var(--primary)' }}>{rating}</h2>
-            <p style={{ color: 'var(--text-dark)' }}>{message}</p>
+          <div className="solid-card" style={{ textAlign: 'center', backgroundColor: rating === '주의가 필요합니다' ? '#FFEBEE' : 'var(--primary-light)', borderColor: rating === '주의가 필요합니다' ? 'var(--danger)' : 'var(--primary)' }}>
+            <h2 style={{ color: rating === '주의가 필요합니다' ? 'var(--danger)' : 'var(--primary)', fontSize: '40px', fontWeight: '800' }}>{rating}</h2>
+            <p style={{ color: 'var(--text-dark)', marginTop: '20px' }}>{message}</p>
           </div>
           <div className="stats-grid">
             <div className="stat-card">
@@ -250,19 +250,19 @@ function App() {
 
       const avgAccuracy = (totalAccuracy / results.length).toFixed(1);
       
-      let rating = "양호함";
+      let rating = "건강합니다";
       let message = "발음이 명확하고 말하는 속도가 안정적입니다. 아주 건강한 언어 능력을 보여주고 계십니다.";
       
       if (avgAccuracy < 70 || totalPauses > 3 || totalRepeats > 2) {
-        rating = "주의 필요";
-        message = "말의 속도가 불규칙하거나 머뭇거림, 단어 반복 현상이 감지되었습니다. 의사와 가벼운 상담을 받아보시는 것도 좋습니다.";
+        rating = "주의가 필요합니다";
+        message = "말씀 중간에 멈춤이나 반복이 감지되었습니다. 주변의 가족이나 전문가와 가벼운 대화를 나누어보시는 것도 큰 도움이 됩니다.";
       }
 
       return (
         <React.Fragment>
-          <div className="glass-card" style={{ textAlign: 'center', backgroundColor: rating === '주의 필요' ? '#FEF2F2' : 'var(--primary-light)' }}>
-            <h2 style={{ color: rating === '주의 필요' ? 'var(--danger)' : 'var(--primary)' }}>{rating}</h2>
-            <p style={{ color: 'var(--text-dark)' }}>{message}</p>
+          <div className="solid-card" style={{ textAlign: 'center', backgroundColor: rating === '주의가 필요합니다' ? '#FFEBEE' : 'var(--primary-light)', borderColor: rating === '주의가 필요합니다' ? 'var(--danger)' : 'var(--primary)' }}>
+            <h2 style={{ color: rating === '주의가 필요합니다' ? 'var(--danger)' : 'var(--primary)', fontSize: '40px', fontWeight: '800' }}>{rating}</h2>
+            <p style={{ color: 'var(--text-dark)', marginTop: '20px' }}>{message}</p>
           </div>
           <div className="stats-grid">
             <div className="stat-card">
@@ -305,25 +305,25 @@ function App() {
       {stage === 'select-mode' && (
         <div className="center-content fade-in">
           <div className="header-icon">🧠</div>
-          <h1>두뇌 활력 테스트</h1>
-          <p style={{ marginBottom: '32px' }}>
-            본인에게 편한 방식을 선택하여 인지 기능과 주의 집중력을 확인해 보세요.
+          <h1>기억력 튼튼 테스트</h1>
+          <p style={{ marginBottom: '40px', fontSize: '24px' }}>
+            원하시는 검사 방식을 화면에서 <strong>크게</strong> 눌러주세요.
           </p>
           
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', width: '100%' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '24px', width: '100%' }}>
             <div className="mode-card" onClick={() => handleSelectMode('typing')}>
               <div className="mode-icon">⌨️</div>
               <div className="mode-info">
-                <h3>타자 치기 테스트</h3>
-                <p>화면에 나오는 문장을 따라 치는 테스트입니다. 손가락 운동과 집중력 파악에 좋습니다.</p>
+                <h3>글씨 직접 치기</h3>
+                <p>화면에 나오는 글자를 키보드로 따라 칩니다.</p>
               </div>
             </div>
             
             <div className="mode-card" onClick={() => handleSelectMode('voice')}>
               <div className="mode-icon">🎙️</div>
               <div className="mode-info">
-                <h3>목소리 읽기 테스트</h3>
-                <p>제시된 문장을 소리 내어 읽는 테스트입니다. 발음과 언어 유창성을 파악합니다.</p>
+                <h3>목소리로 읽기</h3>
+                <p>화면에 나오는 글자를 소리내어 또박또박 읽습니다.</p>
               </div>
             </div>
           </div>
@@ -333,31 +333,36 @@ function App() {
       {/* Typing Intro */}
       {stage === 'typing-intro' && (
         <div className="center-content fade-in">
-          <button className="back-btn" onClick={() => setStage('select-mode')}>← 뒤로</button>
+          <button className="back-btn" onClick={() => setStage('select-mode')}>← 처음으로</button>
           <div className="header-icon">⌨️</div>
-          <h1>타자 치기 테스트</h1>
-          <p style={{ marginBottom: '40px' }}>
-            편안한 마음으로 화면에 나오는 문장을 똑같이 따라 치시면 됩니다.
-          </p>
-          <button className="btn" onClick={handleStartTest}>테스트 시작하기</button>
+          <h1>글씨 직접 치기</h1>
+          <div className="solid-card" style={{ marginBottom: '40px', textAlign: 'center' }}>
+            <p style={{ fontSize: '24px', fontWeight: 'bold' }}>
+              안내 문구를 보시고 똑같이 <br/>키보드로 쳐주시면 됩니다.<br/><br/>
+              천천히, 편안하게<br/>진행해 보세요.
+            </p>
+          </div>
+          <button className="btn" onClick={handleStartTest}>시작하기</button>
         </div>
       )}
 
       {/* Voice Intro */}
       {stage === 'voice-intro' && (
         <div className="center-content fade-in">
-          <button className="back-btn" onClick={() => setStage('select-mode')}>← 뒤로</button>
+          <button className="back-btn" onClick={() => setStage('select-mode')}>← 처음으로</button>
           <div className="header-icon">🎙️</div>
-          <h1>목소리 읽기 테스트</h1>
-          <p style={{ marginBottom: '40px' }}>
-            마이크를 켜고 화면에 나오는 문장을 또박또박 소리 내어 읽어주세요. 발음의 정확도, 머뭇거림 등을 분석합니다.
-          </p>
+          <h1>목소리로 읽기</h1>
+          <div className="solid-card" style={{ marginBottom: '40px', textAlign: 'center' }}>
+            <p style={{ fontSize: '24px', fontWeight: 'bold' }}>
+              마이크에 대고<br/>화면에 나오는 글자를<br/>소리 내어 또박또박 읽어주세요.
+            </p>
+          </div>
           {!voiceSupport ? (
             <div className="error-box">
-              해당 브라우저에서는 음성 인식 기술이 지원되지 않습니다. 타자 치기 테스트를 이용해 주세요.
+              해당 기기에서는 마이크 기능을 쓸 수 없습니다.<br/><br/>[처음으로] 버튼을 눌러 [글씨 직접 치기]를 이용해 주세요.
             </div>
           ) : (
-            <button className="btn" onClick={handleStartTest}>테스트 시작하기</button>
+            <button className="btn" onClick={handleStartTest}>시작하기</button>
           )}
         </div>
       )}
@@ -368,9 +373,11 @@ function App() {
           <div className="progress-container">
             <div className="progress-bar" style={{ width: `${((currentSentenceIndex) / SENTENCES.length) * 100}%` }}></div>
           </div>
-          <span className="progress-text">문장 {currentSentenceIndex + 1} / {SENTENCES.length}</span>
+          <div style={{ textAlign: 'center' }}>
+            <span className="progress-text">현재 단계 : {currentSentenceIndex + 1} / {SENTENCES.length}</span>
+          </div>
           
-          <h2 style={{ marginBottom: '24px' }}>다음 문장을 똑같이 쳐주세요</h2>
+          <h2 style={{ marginBottom: '30px', textAlign: 'center', fontSize: '32px' }}>네모 안의 글자를 따라 쳐주세요</h2>
           
           <div className="sentence-container">
             <div className="target-sentence">{renderTargetSentence()}</div>
@@ -382,12 +389,12 @@ function App() {
             className="typing-input"
             value={userInput}
             onChange={(e) => setUserInput(e.target.value)}
-            placeholder="여기에 입력하세요"
+            placeholder="이곳을 눌러 글을 써주세요"
             spellCheck={false}
           />
           
           <button className="btn" onClick={handleTypingNext} disabled={userInput.length === 0}>
-            {currentSentenceIndex === SENTENCES.length - 1 ? '분석하기' : '다음 문장'}
+            {currentSentenceIndex === SENTENCES.length - 1 ? '완료하기' : '다 쳤습니다 (다음으로)'}
           </button>
         </div>
       )}
@@ -398,12 +405,14 @@ function App() {
           <div className="progress-container">
             <div className="progress-bar" style={{ width: `${((currentSentenceIndex) / VOICE_SENTENCES.length) * 100}%` }}></div>
           </div>
-          <span className="progress-text">문장 {currentSentenceIndex + 1} / {VOICE_SENTENCES.length}</span>
+          <div style={{ textAlign: 'center' }}>
+            <span className="progress-text">현재 단계 : {currentSentenceIndex + 1} / {VOICE_SENTENCES.length}</span>
+          </div>
           
-          <h2 style={{ marginBottom: '24px', textAlign: 'center' }}>다음 문장을 또박또박 읽어주세요</h2>
+          <h2 style={{ marginBottom: '20px', textAlign: 'center', fontSize: '32px' }}>네모 안의 글자를 읽어주세요</h2>
           
           <div className="sentence-container" style={{ padding: '40px 24px' }}>
-            <div className="target-sentence" style={{ fontSize: '28px', color: 'var(--primary-dark)' }}>
+            <div className="target-sentence" style={{ fontSize: '36px', color: 'var(--primary-dark)' }}>
               {VOICE_SENTENCES[currentSentenceIndex]}
             </div>
           </div>
@@ -413,22 +422,22 @@ function App() {
               className={`mic-btn ${isRecording ? 'recording' : ''}`}
               onClick={toggleRecording}
             >
-              <span style={{ fontSize: '32px' }}>{isRecording ? '⏹️' : '🎙️'}</span>
+              <span>{isRecording ? '⏹️' : '🎙️'}</span>
             </button>
-            <p style={{ marginTop: '16px', fontWeight: '600', color: isRecording ? 'var(--danger)' : 'var(--text-muted)' }}>
-              {isRecording ? '듣고 있습니다... 문장을 읽어주세요' : '마이크 아이콘을 눌러 녹음을 시작하세요'}
+            <p style={{ marginTop: '20px', fontWeight: '800', fontSize: '24px', color: isRecording ? 'var(--danger)' : 'var(--text-muted)', textAlign: 'center', wordBreak: 'keep-all' }}>
+              {isRecording ? '듣고 있습니다...\n말씀을 시작해 주세요' : '마이크 모양을 누르면\n녹음이 시작됩니다'}
             </p>
             
             {transcript && (
               <div className="transcript-box">
-                <span style={{ fontSize: '14px', color: 'var(--text-muted)' }}>인식된 문장:</span>
-                <p style={{ marginTop: '4px', color: 'var(--text-dark)' }}>"{transcript}"</p>
+                <span style={{ fontSize: '20px', color: 'var(--text-muted)', fontWeight: 'bold' }}>내가 읽은 글자:</span>
+                <p style={{ marginTop: '8px', color: 'var(--text-dark)', fontSize: '26px' }}><strong>"{transcript}"</strong></p>
               </div>
             )}
           </div>
           
           <button className="btn" onClick={handleVoiceNext} disabled={!transcript && !isRecording && currentSentenceIndex === 0}>
-            {currentSentenceIndex === VOICE_SENTENCES.length - 1 ? '분석하기' : '다음 문장'}
+            {currentSentenceIndex === VOICE_SENTENCES.length - 1 ? '완료하기' : '다 읽었습니다 (다음으로)'}
           </button>
         </div>
       )}
@@ -437,11 +446,14 @@ function App() {
       {stage === 'analyzing' && (
         <div className="center-content fade-in">
           <div className="loader"></div>
-          <h2>결과 정밀 분석 중...</h2>
-          <p>{testMode === 'typing' 
-            ? '입력하신 타자 데이터를 바탕으로 집중력과 인지 능력을 분석하고 있습니다.' 
-            : '음성의 길이, 머뭇거림, 정확도를 바탕으로 언어 유창성을 분석하고 있습니다.'}
-          </p>
+          <h2 style={{ fontSize: '36px', marginBottom: '30px' }}>확인 중입니다...</h2>
+          <div className="solid-card">
+            <p style={{ fontSize: '26px', fontWeight: 'bold', color: 'var(--primary-dark)', margin: 0 }}>
+              {testMode === 'typing' 
+                ? '입력하신 글자를 바탕으로 확인하고 있습니다. 잠시만 기다려주세요.' 
+                : '녹음된 목소리를 바탕으로 확인하고 있습니다. 잠시만 기다려주세요.'}
+            </p>
+          </div>
         </div>
       )}
 
@@ -449,12 +461,12 @@ function App() {
       {stage === 'result' && (
         <div className="fade-in" style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
           <div className="header-icon" style={{ margin: '0 auto 24px auto', background: 'var(--primary)', color: 'white' }}>✨</div>
-          <h1 style={{ textAlign: 'center', marginBottom: '8px' }}>종합 분석 결과</h1>
+          <h1 style={{ textAlign: 'center', marginBottom: '8px', fontSize: '40px' }}>종합 확인 결과</h1>
           
           <div style={{ marginTop: '24px', display: 'flex', flexDirection: 'column', flex: 1 }}>
             {renderResult()}
-            <button className="btn btn-secondary" onClick={() => setStage('select-mode')} style={{ marginTop: 'auto' }}>
-              처음으로 돌아가기
+            <button className="btn btn-secondary" onClick={() => setStage('select-mode')} style={{ marginTop: '40px' }}>
+              처음 화면으로 돌아가기
             </button>
           </div>
         </div>
