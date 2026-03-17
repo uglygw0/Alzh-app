@@ -224,8 +224,8 @@ function App() {
         const timeInMinutes = Math.max(0.1, totalTime / 60);
         const cpm = Math.round(estimatedStrokes / timeInMinutes);
 
-        let rating = "건강합니다";
-        if (accuracy < 85 || cpm < 100) rating = "주의가 필요합니다";
+        let dbRating = "100"; // "건강합니다" 대신 100 저장 (엑셀 한글 깨짐 방지)
+        if (accuracy < 85 || cpm < 100) dbRating = "50"; // "주의가 필요합니다" 대신 50 저장
 
         await supabase.from('test_results').insert([
           {
@@ -233,7 +233,7 @@ function App() {
             birth_year: parseInt(birthYear, 10) || null,
             score: parseFloat(accuracy.toFixed(1)),
             time_taken: parseFloat(totalTime.toFixed(1)),
-            rating: rating
+            rating: dbRating
           }
         ]);
       } else {
@@ -249,9 +249,9 @@ function App() {
         });
         const avgAccuracy = totalAccuracy / finalResults.length;
         
-        let rating = "건강합니다";
+        let dbRating = "100"; // 엑셀 깨짐을 막기 위해 숫자로 저장
         if (avgAccuracy < 70 || totalPauses > 3 || totalRepeats > 2) {
-          rating = "주의가 필요합니다";
+          dbRating = "50";
         }
 
         await supabase.from('test_results').insert([
@@ -260,7 +260,7 @@ function App() {
             birth_year: parseInt(birthYear, 10) || null,
             score: parseFloat(avgAccuracy.toFixed(1)),
             time_taken: parseFloat(totalTime.toFixed(1)),
-            rating: rating
+            rating: dbRating
           }
         ]);
       }
