@@ -224,8 +224,11 @@ function App() {
         const timeInMinutes = Math.max(0.1, totalTime / 60);
         const cpm = Math.round(estimatedStrokes / timeInMinutes);
 
-        let dbRating = "100"; // "건강합니다" 대신 100 저장 (엑셀 한글 깨짐 방지)
-        if (accuracy < 85 || cpm < 100) dbRating = "50"; // "주의가 필요합니다" 대신 50 저장
+        // 어르신 기준으로 120타를 100점 만점으로 계산
+        const speedScore = Math.min(100, (cpm / 120) * 100);
+        // 정확도 70%, 타건 속도 30%를 반영하여 0~100점 사이의 세밀한 종합 점수 산출
+        const comprehensiveScore = Math.round((accuracy * 0.7) + (speedScore * 0.3));
+        const dbRating = comprehensiveScore.toString();
 
         await supabase.from('test_results').insert([
           {
@@ -249,10 +252,10 @@ function App() {
         });
         const avgAccuracy = totalAccuracy / finalResults.length;
         
-        let dbRating = "100"; // 엑셀 깨짐을 막기 위해 숫자로 저장
-        if (avgAccuracy < 70 || totalPauses > 3 || totalRepeats > 2) {
-          dbRating = "50";
-        }
+        // 정확도를 기본으로 두고, 머뭇거림(1회당 -5점)과 단어 반복(1회당 -5점)을 감점 요인으로 계산
+        let comprehensiveScore = Math.round(avgAccuracy - (totalPauses * 5) - (totalRepeats * 5));
+        comprehensiveScore = Math.max(0, Math.min(100, comprehensiveScore)); // 0~100 사이로 보정
+        const dbRating = comprehensiveScore.toString();
 
         await supabase.from('test_results').insert([
           {
