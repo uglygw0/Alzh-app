@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { supabase } from './supabaseClient';
 import './index.css';
 
 const SENTENCES = [
@@ -152,7 +153,7 @@ function App() {
       setUserInput('');
       setStartTime(Date.now());
     } else {
-      finishTest();
+      finishTest(newResults);
     }
   };
 
@@ -200,12 +201,73 @@ function App() {
       setTranscript('');
       setStartTime(null);
     } else {
-      finishTest();
+      finishTest(newResults);
     }
   };
 
-  const finishTest = () => {
+  const finishTest = async (finalResults) => {
     setStage('analyzing');
+    
+    // DB 저장 시작
+    try {
+      if (testMode === 'typing') {
+        let totalErrors = 0;
+        let totalLength = 0;
+        let totalTime = 0;
+        finalResults.forEach(r => {
+          totalErrors += r.errorCount;
+          totalLength += r.length;
+          totalTime += r.timeTaken;
+        });
+        const accuracy = Math.max(0, 100 - (totalErrors / totalLength) * 100);
+        const estimatedStrokes = totalLength * 2.5; 
+        const timeInMinutes = Math.max(0.1, totalTime / 60);
+        const cpm = Math.round(estimatedStrokes / timeInMinutes);
+
+        let rating = "건강합니다";
+        if (accuracy < 85 || cpm < 100) rating = "주의가 필요합니다";
+
+        await supabase.from('test_results').insert([
+          {
+            test_type: 'typing',
+            birth_year: parseInt(birthYear, 10) || null,
+            score: parseFloat(accuracy.toFixed(1)),
+            time_taken: parseFloat(totalTime.toFixed(1)),
+            rating: rating
+          }
+        ]);
+      } else {
+        let totalTime = 0;
+        let totalAccuracy = 0;
+        let totalPauses = 0;
+        let totalRepeats = 0;
+        finalResults.forEach(r => {
+          totalTime += r.timeTaken;
+          totalAccuracy += r.accuracy;
+          totalPauses += r.unexpectedPauses;
+          totalRepeats += r.wordRepetitions;
+        });
+        const avgAccuracy = totalAccuracy / finalResults.length;
+        
+        let rating = "건강합니다";
+        if (avgAccuracy < 70 || totalPauses > 3 || totalRepeats > 2) {
+          rating = "주의가 필요합니다";
+        }
+
+        await supabase.from('test_results').insert([
+          {
+            test_type: 'voice',
+            birth_year: parseInt(birthYear, 10) || null,
+            score: parseFloat(avgAccuracy.toFixed(1)),
+            time_taken: parseFloat(totalTime.toFixed(1)),
+            rating: rating
+          }
+        ]);
+      }
+    } catch (error) {
+      console.error('Error saving to Supabase:', error);
+    }
+
     setTimeout(() => {
       setStage('result');
     }, 2500); 
