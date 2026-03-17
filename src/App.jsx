@@ -14,6 +14,16 @@ const VOICE_SENTENCES = [
   "저녁에는 가족들과 밥을 먹습니다."
 ];
 
+const FORTUNES = [
+  "오늘은 반가운 소식을 듣게 될 기분 좋은 하루입니다.",
+  "생각지도 않은 산책 길에 기분 좋은 일이 생길 수 있습니다.",
+  "가까운 지인이나 가족과 연락을 나누면 큰 평안이 찾아옵니다.",
+  "마음 속의 걱정거리들이 눈 녹듯 속 시원하게 사라질 것입니다.",
+  "건강운이 아주 좋습니다. 든든한 식사 한 끼 챙겨 드세요.",
+  "오랜만에 반가운 얼굴을 보거나 웃음꽃 피는 소식을 듣게 됩니다.",
+  "마음이 넉넉해지니 하루 종일 입가에 미소가 번지는 날입니다."
+];
+
 // 간단한 문자열 비교 함수 (정확도 계산용)
 function calculateAccuracy(target, input) {
   if (!input) return 0;
@@ -29,8 +39,22 @@ function calculateAccuracy(target, input) {
 }
 
 function App() {
-  const [stage, setStage] = useState('select-mode'); // 'select-mode' | 'typing-intro' | 'typing-test' | 'voice-intro' | 'voice-test' | 'analyzing' | 'result'
-  const [testMode, setTestMode] = useState(''); // 'typing' | 'voice'
+  const [stage, setStage] = useState('home'); 
+  const [testMode, setTestMode] = useState(''); 
+  
+  const [birthYear, setBirthYear] = useState('');
+  const [fortune, setFortune] = useState('');
+
+  const handleShowFortune = (e) => {
+    const year = e.target.value;
+    setBirthYear(year);
+    if (year) {
+      const randomIdx = Math.floor(Math.random() * FORTUNES.length);
+      setFortune(FORTUNES[randomIdx]);
+    } else {
+      setFortune('');
+    }
+  };
   
   const [currentSentenceIndex, setCurrentSentenceIndex] = useState(0);
   const [userInput, setUserInput] = useState('');
@@ -302,9 +326,44 @@ function App() {
   return (
     <div className="app-container fade-in">
       
+      {stage === 'home' && (
+        <div className="center-content fade-in">
+          <div className="header-icon" style={{ fontSize: '60px', width: '100px', height: '100px', background: '#FFF8E1', color: '#FFC107', borderColor: '#FFC107' }}>🍀</div>
+          <h1 style={{ fontSize: '38px', marginBottom: '10px' }}>기억력 튼튼 검사</h1>
+          <p style={{ fontSize: '22px', marginBottom: '30px' }}>검사하시기 전, 재미로 오늘의 운세를 확인해 보세요!</p>
+          
+          <div className="solid-card" style={{ width: '100%', marginBottom: '30px', padding: '30px 20px' }}>
+            <h2 style={{ fontSize: '26px', marginBottom: '20px' }}>어르신의 태어난 연도를 고르세요</h2>
+            <select 
+              className="large-select" 
+              value={birthYear} 
+              onChange={handleShowFortune}
+            >
+              <option value="">-- 연도를 누르세요 --</option>
+              {Array.from({ length: 60 }, (_, i) => 1930 + i).map(year => (
+                <option key={year} value={year}>{year}년생</option>
+              ))}
+            </select>
+            
+            {fortune && (
+              <div className="fortune-box fade-in">
+                <p style={{ color: '#D84315', fontSize: '26px', fontWeight: '800', margin: '0' }}>
+                  {fortune}
+                </p>
+              </div>
+            )}
+          </div>
+          
+          <button className="btn" onClick={() => setStage('select-mode')} style={{ padding: '30px 20px', fontSize: '32px' }}>
+            검사 체험하기 👉
+          </button>
+        </div>
+      )}
+
       {stage === 'select-mode' && (
         <div className="center-content fade-in">
-          <div className="header-icon">🧠</div>
+          <button className="back-btn" onClick={() => setStage('home')}>← 이전 화면</button>
+          <div className="header-icon" style={{ marginTop: '20px' }}>🧠</div>
           <h1>기억력 튼튼 테스트</h1>
           <p style={{ marginBottom: '40px', fontSize: '24px' }}>
             원하시는 검사 방식을 화면에서 <strong>크게</strong> 눌러주세요.
