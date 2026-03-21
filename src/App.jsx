@@ -384,15 +384,19 @@ function App() {
         // 어르신 기준으로 120타를 100점 만점으로 계산
         const speedScore = Math.min(100, (cpm / 120) * 100);
         // 정확도 70%, 타건 속도 30%를 반영하여 0~100점 사이의 세밀한 종합 점수 산출
-        const comprehensiveScore = Math.round((accuracy * 0.7) + (speedScore * 0.3));
-        const dbRating = comprehensiveScore.toString();
+        let comprehensiveScore = Math.round((accuracy * 0.7) + (speedScore * 0.3));
+        
+        // 타자 검사 (기준점: 난이도 1.0)
+        let normalizedTime = totalTime * 1.0;
+        let normalizedScore = Math.min(100, comprehensiveScore);
+        const dbRating = normalizedScore.toString();
 
         await supabase.from('test_results').insert([
           {
             test_type: 'typing',
             birth_year: parseInt(birthYear, 10) || null,
-            score: parseFloat(accuracy.toFixed(1)),
-            time_taken: parseFloat(totalTime.toFixed(1)),
+            score: parseFloat(normalizedScore.toFixed(1)),
+            time_taken: parseFloat(normalizedTime.toFixed(1)),
             rating: dbRating
           }
         ]);
@@ -411,15 +415,18 @@ function App() {
 
         // 정확도를 기본으로 두고, 머뭇거림(1회당 -5점)과 단어 반복(1회당 -5점)을 감점 요인으로 계산
         let comprehensiveScore = Math.round(avgAccuracy - (totalPauses * 5) - (totalRepeats * 5));
-        comprehensiveScore = Math.max(0, Math.min(100, comprehensiveScore)); // 0~100 사이로 보정
-        const dbRating = comprehensiveScore.toString();
+        
+        // 음성 검사 (기준점: 난이도 1.0)
+        let normalizedTime = totalTime * 1.0;
+        let normalizedScore = Math.max(0, Math.min(100, comprehensiveScore));
+        const dbRating = normalizedScore.toString();
 
         await supabase.from('test_results').insert([
           {
             test_type: 'voice',
             birth_year: parseInt(birthYear, 10) || null,
-            score: parseFloat(avgAccuracy.toFixed(1)),
-            time_taken: parseFloat(totalTime.toFixed(1)),
+            score: parseFloat(normalizedScore.toFixed(1)),
+            time_taken: parseFloat(normalizedTime.toFixed(1)),
             rating: dbRating
           }
         ]);
@@ -434,15 +441,18 @@ function App() {
         if (timeTaken > 60) {
           score -= (timeTaken - 60) * 0.5;
         }
-        score = Math.max(0, Math.min(100, Math.round(score)));
-        const dbRating = score.toString();
+        
+        // 카드 뒤집기 검사 (매우 어려운 난이도: 시간 보정 x0.35, 점수 추가 보정)
+        let normalizedTime = timeTaken * 0.35;
+        let normalizedScore = Math.max(0, Math.min(100, Math.round(score + 10))); // 난이도를 감안하여 점수 +10 보정
+        const dbRating = normalizedScore.toString();
 
         await supabase.from('test_results').insert([
           {
             test_type: 'card',
             birth_year: parseInt(birthYear, 10) || null,
-            score: parseFloat(score),
-            time_taken: parseFloat(timeTaken.toFixed(1)),
+            score: parseFloat(normalizedScore.toFixed(1)),
+            time_taken: parseFloat(normalizedTime.toFixed(1)),
             rating: dbRating
           }
         ]);
@@ -454,15 +464,18 @@ function App() {
         let score = 100;
         score -= errors * 10;
         if (timeTaken > 30) score -= (timeTaken - 30) * 1;
-        score = Math.max(0, Math.min(100, Math.round(score)));
-        const dbRating = score.toString();
+        
+        // 순서 기억 검사 (어려운 난이도: 시간 보정 x0.5, 점수 추가 보정)
+        let normalizedTime = timeTaken * 0.5;
+        let normalizedScore = Math.max(0, Math.min(100, Math.round(score + 5))); // 난이도를 감안하여 점수 +5 보정
+        const dbRating = normalizedScore.toString();
 
         await supabase.from('test_results').insert([
           {
             test_type: 'sequence',
             birth_year: parseInt(birthYear, 10) || null,
-            score: parseFloat(score),
-            time_taken: parseFloat(timeTaken.toFixed(1)),
+            score: parseFloat(normalizedScore.toFixed(1)),
+            time_taken: parseFloat(normalizedTime.toFixed(1)),
             rating: dbRating
           }
         ]);
