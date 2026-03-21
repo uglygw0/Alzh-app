@@ -239,6 +239,24 @@ function App() {
     }
   };
 
+  const handleSeqSkip = () => {
+    setSeqAttempts(prev => prev + 1);
+    setSeqErrors(prev => prev + 2); // 스킵 시 기본 패널티(오답 2회 처리)
+    
+    setSeqInput('');
+    const next = seqLevel + 1;
+    if (next < SEQ_LEVELS.length) {
+      setSeqLevel(next);
+      setShowingInitial(true);
+      setTimeout(() => setShowingInitial(false), 3000);
+    } else {
+      const timeTaken = Math.max(1, ((Date.now() - startTime) / 1000) - ((SEQ_LEVELS.length - 1) * 3));
+      const newResults = [{ attempts: seqAttempts + 1, errors: seqErrors + 2, timeTaken }];
+      setResults(newResults);
+      finishTest(newResults);
+    }
+  };
+
   // 타이핑 테스트 로직
   const handleTypingNext = () => {
     const endTime = Date.now();
@@ -969,10 +987,11 @@ function App() {
           </div>
 
           {!showingInitial && (
-            <div style={{ width: '100%' }}>
+            <div style={{ width: '100%', display: 'flex', flexDirection: 'column' }}>
               <input
                 type="text"
                 className="typing-input"
+                style={{ marginBottom: '15px' }}
                 value={seqInput}
                 onChange={(e) => setSeqInput(e.target.value)}
                 placeholder="이곳을 눌러 정답을 쓰세요"
@@ -982,9 +1001,14 @@ function App() {
                   if (e.key === 'Enter' && seqInput.length > 0) handleSeqSubmit();
                 }}
               />
-              <button className="btn" onClick={handleSeqSubmit} disabled={seqInput.length === 0}>
-                {seqLevel === SEQ_LEVELS.length - 1 ? '모두 마쳤습니다' : '확인 (다음 단계로)'}
-              </button>
+              <div style={{ display: 'flex', gap: '15px', width: '100%' }}>
+                <button className="btn btn-secondary" onClick={handleSeqSkip} style={{ marginTop: 0, flex: 1, backgroundColor: '#f0f0f0', color: '#666', border: '3px solid #ccc' }}>
+                  모르겠음
+                </button>
+                <button className="btn" onClick={handleSeqSubmit} disabled={seqInput.length === 0} style={{ marginTop: 0, flex: 1 }}>
+                  {seqLevel === SEQ_LEVELS.length - 1 ? '마치기' : '정답 확인'}
+                </button>
+              </div>
             </div>
           )}
         </div>
