@@ -91,6 +91,10 @@ function App() {
   const [seqAttempts, setSeqAttempts] = useState(0);
   const [seqErrors, setSeqErrors] = useState(0);
 
+  // Admin States
+  const [adminPassword, setAdminPassword] = useState('');
+  const [isDownloading, setIsDownloading] = useState(false);
+
   const setupCardLevel = (levelIndex) => {
     const images = CARD_LEVELS[levelIndex];
     const deck = [...images, ...images]
@@ -181,6 +185,74 @@ function App() {
       }
     }
   }, [matchedCards, stage, testMode, showingInitial, cards.length, cardLevel]);
+
+  // Admin Handlers
+  const handleAdminClick = () => {
+    setStage('admin-login');
+    setAdminPassword('');
+  };
+
+  const handleAdminSubmit = () => {
+    if (adminPassword.toLowerCase() === 'ideas6') {
+      setStage('admin');
+    } else {
+      alert("비밀번호가 일치하지 않습니다.");
+      setAdminPassword('');
+    }
+  };
+
+  const handleDownloadCSV = async () => {
+    setIsDownloading(true);
+    try {
+      const { data, error } = await supabase.from('test_results').select('*');
+      if (error) throw error;
+      
+      if (!data || data.length === 0) {
+        alert("아직 누적된 데이터가 없습니다.");
+        setIsDownloading(false);
+        return;
+      }
+
+      // 1. 헤더 추출
+      const headers = Object.keys(data[0]);
+      const csvRows = [];
+      
+      csvRows.push(headers.join(',')); // 헤더 행 추가
+      
+      // 2. 데이터 추출 및 CSV 형식 변환
+      for (const row of data) {
+        const values = headers.map(header => {
+          const val = row[header];
+          if (val === null || val === undefined) return '';
+          if (typeof val === 'object') {
+            const stringVal = JSON.stringify(val).replace(/"/g, '""');
+            return `"${stringVal}"`; 
+          }
+          if (typeof val === 'string' && (val.includes(',') || val.includes('\n'))) {
+            return `"${val}"`;
+          }
+          return val;
+        });
+        csvRows.push(values.join(','));
+      }
+
+      // 우회전 시 엑셀에서 한글이 깨지지 않게 BOM(FEFF) 추가
+      const csvContent = "\uFEFF" + csvRows.join('\n'); 
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.setAttribute("href", url);
+      link.setAttribute("download", `test_results_${new Date().toISOString().split('T')[0]}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } catch (err) {
+      console.error(err);
+      alert("데이터를 가져오는 중 오류가 발생했습니다.");
+    } finally {
+      setIsDownloading(false);
+    }
+  };
 
   // 공통 핸들러
   const handleSelectMode = (mode) => {
@@ -729,6 +801,55 @@ function App() {
           <button className="btn" onClick={() => setStage('select-mode')} style={{ padding: '30px 20px', fontSize: '32px' }}>
             검사 체험하기 👉
           </button>
+          
+          <button 
+            onClick={handleAdminClick} 
+            style={{ position: 'absolute', bottom: '15px', right: '15px', background: 'transparent', border: 'none', color: '#bbbbbb', fontSize: '13px', cursor: 'pointer', outline: 'none' }}
+          >
+            관리자
+          </button>
+        </div>
+      )}
+
+      {/* Admin Login Stage */}
+      {stage === 'admin-login' && (
+        <div className="center-content fade-in" style={{ justifyContent: 'center', position: 'relative' }}>
+          <div style={{ width: '100%', position: 'absolute', top: '20px', left: '20px' }}>
+            <button className="back-btn" onClick={() => setStage('home')}>← 이전 화면</button>
+          </div>
+          <div className="solid-card" style={{ maxWidth: '400px', width: '100%', margin: '0 auto', textAlign: 'center' }}>
+            <h2>관리자 메뉴</h2>
+            <p style={{ color: 'var(--text-light)', marginBottom: '30px', fontSize: '18px' }}>접근 권한을 위해 비밀번호를 입력해주세요.</p>
+            <input 
+              type="password" 
+              className="typing-input" 
+              value={adminPassword} 
+              onChange={(e) => setAdminPassword(e.target.value)} 
+              placeholder="비밀번호"
+              style={{ textAlign: 'center', marginBottom: '20px', letterSpacing: '4px' }}
+              onKeyDown={(e) => { if (e.key === 'Enter') handleAdminSubmit(); }}
+            />
+            <button className="btn" onClick={handleAdminSubmit}>확인</button>
+          </div>
+        </div>
+      )}
+
+      {/* Admin Dashboard */}
+      {stage === 'admin' && (
+        <div className="center-content fade-in" style={{ justifyContent: 'center', position: 'relative' }}>
+          <div style={{ width: '100%', position: 'absolute', top: '20px', left: '20px' }}>
+            <button className="back-btn" onClick={() => setStage('home')}>← 처음으로</button>
+          </div>
+          <div className="solid-card" style={{ maxWidth: '450px', width: '100%', margin: '0 auto', textAlign: 'center' }}>
+            <div className="header-icon" style={{ fontSize: '50px', width: '80px', height: '80px', background: '#E3F2FD', color: '#1976D2', borderColor: '#1976D2' }}>📊</div>
+            <h2>데이터 관리실</h2>
+            <p style={{ color: 'var(--text-dark)', marginBottom: '40px', fontSize: '20px' }}>
+              현재까지 Supabase DB에 누적된 어르신들의 <strong>모든 검사 데이터</strong>를 엑셀(CSV) 파일 형식으로 즉시 다운로드하실 수 있습니다.
+            </p>
+            <button className="btn" onClick={handleDownloadCSV} disabled={isDownloading}>
+              {isDownloading ? '데이터 생성 중...' : '결과 다운로드 (CSV) 📥'}
+            </button>
+          </div>
         </div>
       )}
 
