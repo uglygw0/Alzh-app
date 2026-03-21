@@ -1006,7 +1006,7 @@ function App() {
                   모르겠음
                 </button>
                 <button className="btn" onClick={handleSeqSubmit} disabled={seqInput.length === 0} style={{ marginTop: 0, flex: 1 }}>
-                  {seqLevel === SEQ_LEVELS.length - 1 ? '마치기' : '정답 확인'}
+                  {seqLevel === SEQ_LEVELS.length - 1 ? '마치기' : '제출하기'}
                 </button>
               </div>
             </div>
