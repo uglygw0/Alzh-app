@@ -25,13 +25,19 @@ const FORTUNES = [
   "마음이 넉넉해지니 하루 종일 입가에 미소가 번지는 날입니다."
 ];
 
+const CARD_LEVELS = [
+  ['🌞', '🌙', '⭐', '🌳'],
+  ['🌞', '🌙', '⭐', '🌳', '🍎', '🐶'],
+  ['🌞', '🌙', '⭐', '🌳', '🍎', '🐶', '🚗', '🎈']
+];
+
 // 간단한 문자열 비교 함수 (정확도 계산용)
 function calculateAccuracy(target, input) {
   if (!input) return 0;
   let matches = 0;
   const targetChars = target.replace(/\s+/g, '').split('');
   const inputChars = input.replace(/\s+/g, '').split('');
-  
+
   const minLen = Math.min(targetChars.length, inputChars.length);
   for (let i = 0; i < minLen; i++) {
     if (targetChars[i] === inputChars[i]) matches++;
@@ -40,9 +46,9 @@ function calculateAccuracy(target, input) {
 }
 
 function App() {
-  const [stage, setStage] = useState('home'); 
-  const [testMode, setTestMode] = useState(''); 
-  
+  const [stage, setStage] = useState('home');
+  const [testMode, setTestMode] = useState('');
+
   const [birthYear, setBirthYear] = useState('');
   const [fortune, setFortune] = useState('');
 
@@ -56,17 +62,46 @@ function App() {
       setFortune('');
     }
   };
-  
+
   const [currentSentenceIndex, setCurrentSentenceIndex] = useState(0);
   const [userInput, setUserInput] = useState('');
   const [startTime, setStartTime] = useState(null);
   const [results, setResults] = useState([]);
 
+  // Card Game States
+  const [cards, setCards] = useState([]);
+  const [flippedCards, setFlippedCards] = useState([]);
+  const [matchedCards, setMatchedCards] = useState([]);
+  const [cardAttempts, setCardAttempts] = useState(0);
+  const [isInteractionDisabled, setIsInteractionDisabled] = useState(false);
+  const [showingInitial, setShowingInitial] = useState(false);
+  const [cardLevel, setCardLevel] = useState(0);
+
+  const setupCardLevel = (levelIndex) => {
+    const images = CARD_LEVELS[levelIndex];
+    const deck = [...images, ...images]
+      .sort(() => Math.random() - 0.5)
+      .map((img, index) => ({ id: index, img }));
+    setCards(deck);
+    setFlippedCards([]);
+    setMatchedCards([]);
+    setShowingInitial(true);
+    setIsInteractionDisabled(true);
+
+    setTimeout(() => {
+      setShowingInitial(false);
+      setIsInteractionDisabled(false);
+      if (levelIndex === 0) {
+        setStartTime(Date.now());
+      }
+    }, 3000);
+  };
+
   // Voice Test States
   const [isRecording, setIsRecording] = useState(false);
   const [transcript, setTranscript] = useState('');
   const [voiceSupport, setVoiceSupport] = useState(true);
-  
+
   // Refs
   const inputRef = useRef(null);
   const recognitionRef = useRef(null);
@@ -112,6 +147,27 @@ function App() {
     }
   }, [stage, currentSentenceIndex]);
 
+  useEffect(() => {
+    if (testMode === 'card' && stage === 'card-test' && cards.length > 0 && matchedCards.length === cards.length && !showingInitial) {
+      if (cardLevel < 2) {
+        setTimeout(() => {
+          const nextLevel = cardLevel + 1;
+          setCardLevel(nextLevel);
+          setupCardLevel(nextLevel);
+        }, 1500);
+      } else {
+        setTimeout(() => {
+          const endTime = Date.now();
+          const timeTaken = Math.max(1, ((endTime - startTime) / 1000) - 6);
+          
+          const newResults = [{ attempts: cardAttempts, timeTaken }];
+          setResults(newResults);
+          finishTest(newResults);
+        }, 1500);
+      }
+    }
+  }, [matchedCards, stage, testMode, showingInitial, cards.length, cardLevel]);
+
   // 공통 핸들러
   const handleSelectMode = (mode) => {
     setTestMode(mode);
@@ -124,7 +180,14 @@ function App() {
     setUserInput('');
     setTranscript('');
     setResults([]);
-    setStartTime(Date.now());
+    
+    if (testMode === 'card') {
+      setCardLevel(0);
+      setCardAttempts(0);
+      setupCardLevel(0);
+    } else {
+      setStartTime(Date.now());
+    }
   };
 
   // 타이핑 테스트 로직
@@ -175,11 +238,11 @@ function App() {
       recognitionRef.current.stop();
       setIsRecording(false);
     }
-    
+
     const endTime = Date.now();
     const timeTaken = (endTime - startTime) / 1000;
     const targetSentence = VOICE_SENTENCES[currentSentenceIndex];
-    
+
     const accuracy = calculateAccuracy(targetSentence, transcript);
 
     const unexpectedPauses = Math.max(0, Math.floor(timeTaken / 3) - 1); // 3초당 1번 이상의 멈춤이 있으면 감점 요인으로 시뮬레이션
@@ -205,9 +268,36 @@ function App() {
     }
   };
 
+  const handleCardClick = (id) => {
+    if (isInteractionDisabled || showingInitial) return;
+    if (matchedCards.includes(id) || flippedCards.includes(id)) return;
+
+    const newFlipped = [...flippedCards, id];
+    setFlippedCards(newFlipped);
+
+    if (newFlipped.length === 2) {
+      setIsInteractionDisabled(true);
+      setCardAttempts(prev => prev + 1);
+
+      const match1 = cards.find(c => c.id === newFlipped[0]);
+      const match2 = cards.find(c => c.id === newFlipped[1]);
+
+      if (match1.img === match2.img) {
+        setMatchedCards(prev => [...prev, match1.id, match2.id]);
+        setFlippedCards([]);
+        setIsInteractionDisabled(false);
+      } else {
+        setTimeout(() => {
+          setFlippedCards([]);
+          setIsInteractionDisabled(false);
+        }, 1000);
+      }
+    }
+  };
+
   const finishTest = async (finalResults) => {
     setStage('analyzing');
-    
+
     // DB 저장 시작
     try {
       if (testMode === 'typing') {
@@ -220,7 +310,7 @@ function App() {
           totalTime += r.timeTaken;
         });
         const accuracy = Math.max(0, 100 - (totalErrors / totalLength) * 100);
-        const estimatedStrokes = totalLength * 2.5; 
+        const estimatedStrokes = totalLength * 2.5;
         const timeInMinutes = Math.max(0.1, totalTime / 60);
         const cpm = Math.round(estimatedStrokes / timeInMinutes);
 
@@ -239,7 +329,7 @@ function App() {
             rating: dbRating
           }
         ]);
-      } else {
+      } else if (testMode === 'voice') {
         let totalTime = 0;
         let totalAccuracy = 0;
         let totalPauses = 0;
@@ -251,7 +341,7 @@ function App() {
           totalRepeats += r.wordRepetitions;
         });
         const avgAccuracy = totalAccuracy / finalResults.length;
-        
+
         // 정확도를 기본으로 두고, 머뭇거림(1회당 -5점)과 단어 반복(1회당 -5점)을 감점 요인으로 계산
         let comprehensiveScore = Math.round(avgAccuracy - (totalPauses * 5) - (totalRepeats * 5));
         comprehensiveScore = Math.max(0, Math.min(100, comprehensiveScore)); // 0~100 사이로 보정
@@ -266,6 +356,29 @@ function App() {
             rating: dbRating
           }
         ]);
+      } else if (testMode === 'card') {
+        const result = finalResults[0];
+        const timeTaken = result.timeTaken;
+        const attempts = result.attempts;
+        const errors = Math.max(0, attempts - 18);
+        
+        let score = 100;
+        score -= errors * 5;
+        if (timeTaken > 60) {
+          score -= (timeTaken - 60) * 0.5;
+        }
+        score = Math.max(0, Math.min(100, Math.round(score)));
+        const dbRating = score.toString();
+
+        await supabase.from('test_results').insert([
+          {
+            test_type: 'card',
+            birth_year: parseInt(birthYear, 10) || null,
+            score: parseFloat(score),
+            time_taken: parseFloat(timeTaken.toFixed(1)),
+            rating: dbRating
+          }
+        ]);
       }
     } catch (error) {
       console.error('Error saving to Supabase:', error);
@@ -273,7 +386,7 @@ function App() {
 
     setTimeout(() => {
       setStage('result');
-    }, 2500); 
+    }, 2500);
   };
 
   // 결과 계산 뷰
@@ -290,7 +403,7 @@ function App() {
       });
 
       const accuracy = Math.max(0, 100 - (totalErrors / totalLength) * 100).toFixed(1);
-      const estimatedStrokes = totalLength * 2.5; 
+      const estimatedStrokes = totalLength * 2.5;
       const timeInMinutes = Math.max(0.1, totalTime / 60);
       const cpm = Math.round(estimatedStrokes / timeInMinutes);
 
@@ -323,7 +436,7 @@ function App() {
           </div>
         </React.Fragment>
       );
-    } else {
+    } else if (testMode === 'voice') {
       // Voice Results
       let totalTime = 0;
       let totalAccuracy = 0;
@@ -338,10 +451,10 @@ function App() {
       });
 
       const avgAccuracy = (totalAccuracy / results.length).toFixed(1);
-      
+
       let rating = "건강합니다";
       let message = "발음이 명확하고 말하는 속도가 안정적입니다. 아주 건강한 언어 능력을 보여주고 계십니다.";
-      
+
       if (avgAccuracy < 70 || totalPauses > 3 || totalRepeats > 2) {
         rating = "주의가 필요합니다";
         message = "말씀 중간에 멈춤이나 반복이 감지되었습니다. 주변의 가족이나 전문가와 가벼운 대화를 나누어보시는 것도 큰 도움이 됩니다.";
@@ -373,6 +486,49 @@ function App() {
           </div>
         </React.Fragment>
       );
+    } else if (testMode === 'card') {
+      const result = results[0];
+      const attempts = result ? result.attempts : 0;
+      const timeTaken = result ? result.timeTaken : 0;
+      
+      const errors = Math.max(0, attempts - 18);
+      let score = 100;
+      score -= errors * 5;
+      if (timeTaken > 60) {
+        score -= (timeTaken - 60) * 0.5;
+      }
+      score = Math.max(0, Math.min(100, Math.round(score)));
+
+      let rating = "건강합니다";
+      let message = "그림의 위치를 잘 기억하고 정확하게 맞추셨습니다. 집중력과 기억력이 훌륭하십니다!";
+
+      if (score < 70 || attempts >= 35) {
+        rating = "주의가 필요합니다";
+        message = "난이도가 올라갈수록 위치를 기억하는 데 다소 어려움이 있으셨습니다. 꾸준한 두뇌 활동 게임을 통해 기억력을 훈련하시면 큰 도움이 됩니다.";
+      }
+
+      return (
+        <React.Fragment>
+          <div className="solid-card" style={{ textAlign: 'center', backgroundColor: rating === '주의가 필요합니다' ? '#FFEBEE' : 'var(--primary-light)', borderColor: rating === '주의가 필요합니다' ? 'var(--danger)' : 'var(--primary)' }}>
+            <h2 style={{ color: rating === '주의가 필요합니다' ? 'var(--danger)' : 'var(--primary)', fontSize: '40px', fontWeight: '800' }}>{rating}</h2>
+            <p style={{ color: 'var(--text-dark)', marginTop: '20px' }}>{message}</p>
+          </div>
+          <div className="stats-grid">
+            <div className="stat-card">
+              <div className="stat-value">{score}점</div>
+              <div className="stat-label">종합 점수</div>
+            </div>
+            <div className="stat-card warning">
+              <div className="stat-value">{attempts}회</div>
+              <div className="stat-label">시도 횟수</div>
+            </div>
+            <div className="stat-card" style={{ gridColumn: '1 / -1' }}>
+              <div className="stat-value" style={{ fontSize: '24px' }}>{timeTaken.toFixed(1)}초</div>
+              <div className="stat-label">총 소요 시간</div>
+            </div>
+          </div>
+        </React.Fragment>
+      );
     }
   };
 
@@ -390,26 +546,26 @@ function App() {
 
   return (
     <div className="app-container fade-in">
-      
+
       {stage === 'home' && (
         <div className="center-content fade-in">
           <div className="header-icon" style={{ fontSize: '60px', width: '100px', height: '100px', background: '#FFF8E1', color: '#FFC107', borderColor: '#FFC107' }}>🍀</div>
           <h1 style={{ fontSize: '38px', marginBottom: '10px' }}>기억력 튼튼 검사</h1>
           <p style={{ fontSize: '22px', marginBottom: '30px' }}>검사하시기 전, 재미로 오늘의 운세를 확인해 보세요!</p>
-          
+
           <div className="solid-card" style={{ width: '100%', marginBottom: '30px', padding: '30px 20px' }}>
             <h2 style={{ fontSize: '26px', marginBottom: '20px' }}>어르신의 태어난 연도를 고르세요</h2>
-            <select 
-              className="large-select" 
-              value={birthYear} 
+            <select
+              className="large-select"
+              value={birthYear}
               onChange={handleShowFortune}
             >
               <option value="">-- 연도를 누르세요 --</option>
-              {Array.from({ length: 60 }, (_, i) => 1930 + i).map(year => (
+              {Array.from({ length: 2026 - 1920 + 1 }, (_, i) => 1920 + i).map(year => (
                 <option key={year} value={year}>{year}년생</option>
               ))}
             </select>
-            
+
             {fortune && (
               <div className="fortune-box fade-in">
                 <p style={{ color: '#D84315', fontSize: '26px', fontWeight: '800', margin: '0' }}>
@@ -418,7 +574,7 @@ function App() {
               </div>
             )}
           </div>
-          
+
           <button className="btn" onClick={() => setStage('select-mode')} style={{ padding: '30px 20px', fontSize: '32px' }}>
             검사 체험하기 👉
           </button>
@@ -436,7 +592,7 @@ function App() {
             <p style={{ marginBottom: '40px', fontSize: '24px' }}>
               원하시는 검사 방식을 화면에서 <strong>크게</strong> 눌러주세요.
             </p>
-            
+
             <div style={{ display: 'flex', flexDirection: 'column', gap: '24px', width: '100%' }}>
               <div className="mode-card" onClick={() => handleSelectMode('typing')}>
                 <div className="mode-icon">⌨️</div>
@@ -445,12 +601,20 @@ function App() {
                   <p>화면에 나오는 글자를 키보드로 따라 칩니다.</p>
                 </div>
               </div>
-              
+
               <div className="mode-card" onClick={() => handleSelectMode('voice')}>
                 <div className="mode-icon">🎙️</div>
                 <div className="mode-info">
                   <h3>목소리로 읽기</h3>
                   <p>화면에 나오는 글자를 소리내어 또박또박 읽습니다.</p>
+                </div>
+              </div>
+
+              <div className="mode-card" onClick={() => handleSelectMode('card')}>
+                <div className="mode-icon">🃏</div>
+                <div className="mode-info">
+                  <h3>그림 짝맞추기</h3>
+                  <p>카드 그림의 위치를 외우고 같은 짝을 맞춥니다.</p>
                 </div>
               </div>
             </div>
@@ -469,8 +633,8 @@ function App() {
             <h1>글씨 직접 치기</h1>
             <div className="solid-card" style={{ marginBottom: '40px', textAlign: 'center' }}>
               <p style={{ fontSize: '24px', fontWeight: 'bold' }}>
-                안내 문구를 보시고 똑같이 <br/>키보드로 쳐주시면 됩니다.<br/><br/>
-                천천히, 편안하게<br/>진행해 보세요.
+                안내 문구를 보시고 똑같이 <br />키보드로 쳐주시면 됩니다.<br /><br />
+                천천히, 편안하게<br />진행해 보세요.
               </p>
             </div>
             <button className="btn" onClick={handleStartTest}>시작하기</button>
@@ -489,12 +653,12 @@ function App() {
             <h1>목소리로 읽기</h1>
             <div className="solid-card" style={{ marginBottom: '40px', textAlign: 'center' }}>
               <p style={{ fontSize: '24px', fontWeight: 'bold' }}>
-                마이크에 대고<br/>화면에 나오는 글자를<br/>소리 내어 또박또박 읽어주세요.
+                마이크에 대고<br />화면에 나오는 글자를<br />소리 내어 또박또박 읽어주세요.
               </p>
             </div>
             {!voiceSupport ? (
               <div className="error-box">
-                해당 기기에서는 마이크 기능을 쓸 수 없습니다.<br/><br/>[처음으로] 버튼을 눌러 [글씨 직접 치기]를 이용해 주세요.
+                해당 기기에서는 마이크 기능을 쓸 수 없습니다.<br /><br />[처음으로] 버튼을 눌러 [글씨 직접 치기]를 이용해 주세요.
               </div>
             ) : (
               <button className="btn" onClick={handleStartTest}>시작하기</button>
@@ -512,13 +676,13 @@ function App() {
           <div style={{ textAlign: 'center' }}>
             <span className="progress-text">현재 단계 : {currentSentenceIndex + 1} / {SENTENCES.length}</span>
           </div>
-          
+
           <h2 style={{ marginBottom: '30px', textAlign: 'center', fontSize: '32px' }}>네모 안의 글자를 따라 쳐주세요</h2>
-          
+
           <div className="sentence-container">
             <div className="target-sentence">{renderTargetSentence()}</div>
           </div>
-          
+
           <input
             ref={inputRef}
             type="text"
@@ -528,7 +692,7 @@ function App() {
             placeholder="이곳을 눌러 글을 써주세요"
             spellCheck={false}
           />
-          
+
           <button className="btn" onClick={handleTypingNext} disabled={userInput.length === 0}>
             {currentSentenceIndex === SENTENCES.length - 1 ? '완료하기' : '다 쳤습니다 (다음으로)'}
           </button>
@@ -544,9 +708,9 @@ function App() {
           <div style={{ textAlign: 'center' }}>
             <span className="progress-text">현재 단계 : {currentSentenceIndex + 1} / {VOICE_SENTENCES.length}</span>
           </div>
-          
+
           <h2 style={{ marginBottom: '20px', textAlign: 'center', fontSize: '32px' }}>네모 안의 글자를 읽어주세요</h2>
-          
+
           <div className="sentence-container" style={{ padding: '40px 24px' }}>
             <div className="target-sentence" style={{ fontSize: '36px', color: 'var(--primary-dark)' }}>
               {VOICE_SENTENCES[currentSentenceIndex]}
@@ -554,7 +718,7 @@ function App() {
           </div>
 
           <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
-            <button 
+            <button
               className={`mic-btn ${isRecording ? 'recording' : ''}`}
               onClick={toggleRecording}
             >
@@ -563,7 +727,7 @@ function App() {
             <p style={{ marginTop: '20px', fontWeight: '800', fontSize: '24px', color: isRecording ? 'var(--danger)' : 'var(--text-muted)', textAlign: 'center', wordBreak: 'keep-all' }}>
               {isRecording ? '듣고 있습니다...\n말씀을 시작해 주세요' : '마이크 모양을 누르면\n녹음이 시작됩니다'}
             </p>
-            
+
             {transcript && (
               <div className="transcript-box">
                 <span style={{ fontSize: '20px', color: 'var(--text-muted)', fontWeight: 'bold' }}>내가 읽은 글자:</span>
@@ -571,10 +735,76 @@ function App() {
               </div>
             )}
           </div>
-          
+
           <button className="btn" onClick={handleVoiceNext} disabled={!transcript && !isRecording && currentSentenceIndex === 0}>
             {currentSentenceIndex === VOICE_SENTENCES.length - 1 ? '완료하기' : '다 읽었습니다 (다음으로)'}
           </button>
+        </div>
+      )}
+
+      {/* Card Intro */}
+      {stage === 'card-intro' && (
+        <div className="fade-in" style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+          <div style={{ width: '100%' }}>
+            <button className="back-btn" onClick={() => setStage('select-mode')}>← 이전 화면</button>
+          </div>
+          <div className="center-content" style={{ flex: 1, justifyContent: 'flex-start', paddingTop: '10px' }}>
+            <div className="header-icon">🃏</div>
+            <h1>그림 짝맞추기 게임</h1>
+            <div className="solid-card" style={{ marginBottom: '40px', textAlign: 'center' }}>
+              <p style={{ fontSize: '24px', fontWeight: 'bold' }}>
+                처음 3초 동안 그림이 나옵니다.<br />
+                그림의 위치를 잘 기억해 두었다가<br />
+                같은 그림 짝을 찾아주시면 됩니다.<br />
+                <br />
+                총 3단계로 갈수록 카드가 많아집니다!
+              </p>
+            </div>
+            <button className="btn" onClick={handleStartTest}>시작하기</button>
+          </div>
+        </div>
+      )}
+
+      {/* Card Test */}
+      {stage === 'card-test' && (
+        <div className="fade-in" style={{ display: 'flex', flexDirection: 'column', height: '100%', alignItems: 'center', overflowY: 'auto' }}>
+          <div style={{ width: '100%' }}>
+            <h2 style={{ marginBottom: '10px', textAlign: 'center', fontSize: '32px' }}>
+              {showingInitial ? '그림의 위치를 기억하세요!' : '같은 그림의 짝을 찾아주세요'}
+            </h2>
+            <div style={{ marginBottom: '20px', color: 'var(--primary)', fontWeight: 'bold', fontSize: '22px', textAlign: 'center' }}>
+              현재 단계: {cardLevel + 1} / 3
+            </div>
+          </div>
+          
+          <div className="card-grid">
+            {cards.map(card => {
+              const isFlipped = showingInitial || flippedCards.includes(card.id) || matchedCards.includes(card.id);
+              const isMatched = matchedCards.includes(card.id);
+              
+              return (
+                <div 
+                  key={card.id} 
+                  className={`game-card ${isFlipped ? 'flipped' : ''} ${isMatched ? 'matched' : ''}`}
+                  onClick={() => handleCardClick(card.id)}
+                >
+                  <div className="game-card-inner">
+                    <div className="game-card-front">
+                      <span>❓</span>
+                    </div>
+                    <div className="game-card-back">
+                      <span>{card.img}</span>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+          <div style={{ margin: '30px 0', textAlign: 'center', width: '100%' }}>
+             <p style={{ fontSize: '24px', fontWeight: 'bold' }}>
+               시도: {cardAttempts}회
+             </p>
+          </div>
         </div>
       )}
 
@@ -585,9 +815,11 @@ function App() {
           <h2 style={{ fontSize: '36px', marginBottom: '30px' }}>확인 중입니다...</h2>
           <div className="solid-card">
             <p style={{ fontSize: '26px', fontWeight: 'bold', color: 'var(--primary-dark)', margin: 0 }}>
-              {testMode === 'typing' 
-                ? '입력하신 글자를 바탕으로 확인하고 있습니다. 잠시만 기다려주세요.' 
-                : '녹음된 목소리를 바탕으로 확인하고 있습니다. 잠시만 기다려주세요.'}
+              {testMode === 'typing'
+                ? '입력하신 글자를 바탕으로 확인하고 있습니다. 잠시만 기다려주세요.'
+                : testMode === 'voice' 
+                ? '녹음된 목소리를 바탕으로 확인하고 있습니다. 잠시만 기다려주세요.'
+                : '게임 결과를 바탕으로 확인하고 있습니다. 잠시만 기다려주세요.'}
             </p>
           </div>
         </div>
@@ -598,7 +830,7 @@ function App() {
         <div className="fade-in" style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
           <div className="header-icon" style={{ margin: '0 auto 24px auto', background: 'var(--primary)', color: 'white' }}>✨</div>
           <h1 style={{ textAlign: 'center', marginBottom: '8px', fontSize: '40px' }}>종합 확인 결과</h1>
-          
+
           <div style={{ marginTop: '24px', display: 'flex', flexDirection: 'column', flex: 1 }}>
             {renderResult()}
             <button className="btn btn-secondary" onClick={() => setStage('select-mode')} style={{ marginTop: '40px' }}>
