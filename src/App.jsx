@@ -397,7 +397,10 @@ function App() {
             birth_year: parseInt(birthYear, 10) || null,
             score: parseFloat(normalizedScore.toFixed(1)),
             time_taken: parseFloat(normalizedTime.toFixed(1)),
-            rating: dbRating
+            rating: dbRating,
+            raw_time: parseFloat(totalTime.toFixed(1)),
+            raw_errors: totalErrors,
+            details: { estimatedStrokes, cpm, accuracy: parseFloat(accuracy.toFixed(1)) }
           }
         ]);
       } else if (testMode === 'voice') {
@@ -427,7 +430,10 @@ function App() {
             birth_year: parseInt(birthYear, 10) || null,
             score: parseFloat(normalizedScore.toFixed(1)),
             time_taken: parseFloat(normalizedTime.toFixed(1)),
-            rating: dbRating
+            rating: dbRating,
+            raw_time: parseFloat(totalTime.toFixed(1)),
+            raw_errors: totalPauses + totalRepeats,
+            details: { unexpectedPauses: totalPauses, wordRepetitions: totalRepeats, accuracy: parseFloat(avgAccuracy.toFixed(1)) }
           }
         ]);
       } else if (testMode === 'card') {
@@ -453,7 +459,10 @@ function App() {
             birth_year: parseInt(birthYear, 10) || null,
             score: parseFloat(normalizedScore.toFixed(1)),
             time_taken: parseFloat(normalizedTime.toFixed(1)),
-            rating: dbRating
+            rating: dbRating,
+            raw_time: parseFloat(timeTaken.toFixed(1)),
+            raw_errors: errors,
+            details: { attempts }
           }
         ]);
       } else if (testMode === 'sequence') {
@@ -476,7 +485,10 @@ function App() {
             birth_year: parseInt(birthYear, 10) || null,
             score: parseFloat(normalizedScore.toFixed(1)),
             time_taken: parseFloat(normalizedTime.toFixed(1)),
-            rating: dbRating
+            rating: dbRating,
+            raw_time: parseFloat(timeTaken.toFixed(1)),
+            raw_errors: errors,
+            details: { attempts: result.attempts }
           }
         ]);
       }
