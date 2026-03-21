@@ -798,16 +798,18 @@ function App() {
             )}
           </div>
 
-          <button className="btn" onClick={() => setStage('select-mode')} style={{ padding: '30px 20px', fontSize: '32px' }}>
-            검사 체험하기 👉
-          </button>
-          
-          <button 
-            onClick={handleAdminClick} 
-            style={{ position: 'absolute', bottom: '15px', right: '15px', background: 'transparent', border: 'none', color: '#bbbbbb', fontSize: '13px', cursor: 'pointer', outline: 'none' }}
-          >
-            관리자
-          </button>
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: '100%' }}>
+            <button className="btn" onClick={() => setStage('select-mode')} style={{ padding: '30px 20px', fontSize: '32px', width: '100%' }}>
+              검사 체험하기 👉
+            </button>
+            
+            <button 
+              onClick={handleAdminClick} 
+              style={{ marginTop: '25px', background: 'transparent', border: 'none', color: '#aaaaaa', fontSize: '14px', cursor: 'pointer', outline: 'none', padding: '10px' }}
+            >
+              관리자 모드
+            </button>
+          </div>
         </div>
       )}
 
