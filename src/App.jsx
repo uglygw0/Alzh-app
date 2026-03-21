@@ -31,6 +31,14 @@ const CARD_LEVELS = [
   ['🌞', '🌙', '⭐', '🌳', '🍎', '🐶', '🚗', '🎈']
 ];
 
+const SEQ_LEVELS = [
+  "6 3 8", 
+  "나무 사과 자동차", 
+  "2 7 1 9", 
+  "바다 구름 자전거 피아노", 
+  "4 9 2 8 5"
+];
+
 // 간단한 문자열 비교 함수 (정확도 계산용)
 function calculateAccuracy(target, input) {
   if (!input) return 0;
@@ -76,6 +84,12 @@ function App() {
   const [isInteractionDisabled, setIsInteractionDisabled] = useState(false);
   const [showingInitial, setShowingInitial] = useState(false);
   const [cardLevel, setCardLevel] = useState(0);
+
+  // Sequence Game States
+  const [seqLevel, setSeqLevel] = useState(0);
+  const [seqInput, setSeqInput] = useState('');
+  const [seqAttempts, setSeqAttempts] = useState(0);
+  const [seqErrors, setSeqErrors] = useState(0);
 
   const setupCardLevel = (levelIndex) => {
     const images = CARD_LEVELS[levelIndex];
@@ -185,8 +199,43 @@ function App() {
       setCardLevel(0);
       setCardAttempts(0);
       setupCardLevel(0);
+    } else if (testMode === 'sequence') {
+      setSeqLevel(0);
+      setSeqAttempts(0);
+      setSeqErrors(0);
+      setSeqInput('');
+      setShowingInitial(true);
+      setTimeout(() => {
+        setShowingInitial(false);
+        setStartTime(Date.now());
+      }, 3000);
     } else {
       setStartTime(Date.now());
+    }
+  };
+
+  const handleSeqSubmit = () => {
+    const target = SEQ_LEVELS[seqLevel].replace(/\s/g, '');
+    const user = seqInput.replace(/\s/g, '');
+    
+    setSeqAttempts(prev => prev + 1);
+    
+    if (target === user) {
+      setSeqInput('');
+      const next = seqLevel + 1;
+      if (next < SEQ_LEVELS.length) {
+        setSeqLevel(next);
+        setShowingInitial(true);
+        setTimeout(() => setShowingInitial(false), 3000);
+      } else {
+        const timeTaken = Math.max(1, ((Date.now() - startTime) / 1000) - ((SEQ_LEVELS.length - 1) * 3));
+        const newResults = [{ attempts: seqAttempts + 1, errors: seqErrors, timeTaken }];
+        setResults(newResults);
+        finishTest(newResults);
+      }
+    } else {
+      setSeqErrors(prev => prev + 1);
+      alert("순서가 틀리거나 글자가 빠졌습니다. 편안하게 다시 입력해보세요!");
     }
   };
 
@@ -379,6 +428,26 @@ function App() {
             rating: dbRating
           }
         ]);
+      } else if (testMode === 'sequence') {
+        const result = finalResults[0];
+        const errors = result.errors;
+        const timeTaken = Math.max(0, result.timeTaken);
+
+        let score = 100;
+        score -= errors * 10;
+        if (timeTaken > 30) score -= (timeTaken - 30) * 1;
+        score = Math.max(0, Math.min(100, Math.round(score)));
+        const dbRating = score.toString();
+
+        await supabase.from('test_results').insert([
+          {
+            test_type: 'sequence',
+            birth_year: parseInt(birthYear, 10) || null,
+            score: parseFloat(score),
+            time_taken: parseFloat(timeTaken.toFixed(1)),
+            rating: dbRating
+          }
+        ]);
       }
     } catch (error) {
       console.error('Error saving to Supabase:', error);
@@ -529,6 +598,45 @@ function App() {
           </div>
         </React.Fragment>
       );
+    } else if (testMode === 'sequence') {
+      const result = results[0] || { errors: 0, timeTaken: 0 };
+      const errors = result.errors;
+      const timeTaken = result.timeTaken;
+      
+      let score = 100 - (errors * 10);
+      if (timeTaken > 30) score -= (timeTaken - 30) * 1;
+      score = Math.max(0, Math.min(100, Math.round(score)));
+
+      let rating = "건강합니다";
+      let message = "숫자와 단어를 순서대로 아주 정확하게 기억하셨네요. 단기 기억력이 매우 훌륭하십니다!";
+
+      if (score < 70 || errors >= 5) {
+        rating = "주의가 필요합니다";
+        message = "기억하려 애쓰셨지만 순서가 다소 헷갈리셨던 것 같습니다. 단기 기억력 향상을 위해 간단한 암기 훈련을 꾸준히 해보세요.";
+      }
+
+      return (
+        <React.Fragment>
+          <div className="solid-card" style={{ textAlign: 'center', backgroundColor: rating === '주의가 필요합니다' ? '#FFEBEE' : 'var(--primary-light)', borderColor: rating === '주의가 필요합니다' ? 'var(--danger)' : 'var(--primary)' }}>
+            <h2 style={{ color: rating === '주의가 필요합니다' ? 'var(--danger)' : 'var(--primary)', fontSize: '40px', fontWeight: '800' }}>{rating}</h2>
+            <p style={{ color: 'var(--text-dark)', marginTop: '20px' }}>{message}</p>
+          </div>
+          <div className="stats-grid">
+            <div className="stat-card">
+              <div className="stat-value">{score}점</div>
+              <div className="stat-label">종합 점수</div>
+            </div>
+            <div className="stat-card warning">
+              <div className="stat-value">{errors}회</div>
+              <div className="stat-label">오답 횟수</div>
+            </div>
+            <div className="stat-card" style={{ gridColumn: '1 / -1' }}>
+              <div className="stat-value" style={{ fontSize: '24px' }}>{timeTaken.toFixed(1)}초</div>
+              <div className="stat-label">입력 소요 시간</div>
+            </div>
+          </div>
+        </React.Fragment>
+      );
     }
   };
 
@@ -615,6 +723,14 @@ function App() {
                 <div className="mode-info">
                   <h3>그림 짝맞추기</h3>
                   <p>카드 그림의 위치를 외우고 같은 짝을 맞춥니다.</p>
+                </div>
+              </div>
+
+              <div className="mode-card" onClick={() => handleSelectMode('sequence')}>
+                <div className="mode-icon">🔢</div>
+                <div className="mode-info">
+                  <h3>순서 기억 게임</h3>
+                  <p>몇 가지 항목을 보고 올바른 순서대로 입력합니다.</p>
                 </div>
               </div>
             </div>
@@ -805,6 +921,72 @@ function App() {
                시도: {cardAttempts}회
              </p>
           </div>
+        </div>
+      )}
+
+      {/* Sequence Intro */}
+      {stage === 'sequence-intro' && (
+        <div className="fade-in" style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+          <div style={{ width: '100%' }}>
+            <button className="back-btn" onClick={() => setStage('select-mode')}>← 이전 화면</button>
+          </div>
+          <div className="center-content" style={{ flex: 1, justifyContent: 'flex-start', paddingTop: '10px' }}>
+            <div className="header-icon">🔢</div>
+            <h1>순서 기억 게임</h1>
+            <div className="solid-card" style={{ marginBottom: '40px', textAlign: 'center' }}>
+              <p style={{ fontSize: '24px', fontWeight: 'bold' }}>
+                화면에 3초 동안 숫자나 단어가 지나갑니다.<br />
+                사라진 뒤, 쓰여있던 <strong>순서대로 똑같이</strong><br />
+                키보드로 직접 입력해주시면 됩니다.
+              </p>
+            </div>
+            <button className="btn" onClick={handleStartTest}>시작하기</button>
+          </div>
+        </div>
+      )}
+
+      {/* Sequence Test */}
+      {stage === 'sequence-test' && (
+        <div className="fade-in" style={{ display: 'flex', flexDirection: 'column', height: '100%', alignItems: 'center' }}>
+          <div className="progress-container">
+            <div className="progress-bar" style={{ width: `${((seqLevel) / SEQ_LEVELS.length) * 100}%` }}></div>
+          </div>
+          <div style={{ textAlign: 'center', width: '100%' }}>
+            <h2 style={{ marginBottom: '10px', fontSize: '32px' }}>
+              {showingInitial ? '제시된 순서를 기억하세요!' : '기억나는 순서대로 편하게 적어주세요'}
+            </h2>
+            <span className="progress-text">현재 단계 : {seqLevel + 1} / {SEQ_LEVELS.length}</span>
+          </div>
+
+          <div className="sentence-container" style={{ width: '100%', padding: '60px 30px', margin: '40px 0', minHeight: '180px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            {showingInitial ? (
+              <div className="target-sentence" style={{ fontSize: '48px', color: 'var(--primary-dark)', letterSpacing: '4px' }}>
+                {SEQ_LEVELS[seqLevel]}
+              </div>
+            ) : (
+              <div style={{ fontSize: '80px', color: '#DDDDDD' }}>❓</div>
+            )}
+          </div>
+
+          {!showingInitial && (
+            <div style={{ width: '100%' }}>
+              <input
+                type="text"
+                className="typing-input"
+                value={seqInput}
+                onChange={(e) => setSeqInput(e.target.value)}
+                placeholder="이곳을 눌러 정답을 쓰세요"
+                spellCheck={false}
+                autoFocus
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && seqInput.length > 0) handleSeqSubmit();
+                }}
+              />
+              <button className="btn" onClick={handleSeqSubmit} disabled={seqInput.length === 0}>
+                {seqLevel === SEQ_LEVELS.length - 1 ? '모두 마쳤습니다' : '확인 (다음 단계로)'}
+              </button>
+            </div>
+          )}
         </div>
       )}
 
