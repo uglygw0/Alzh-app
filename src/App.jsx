@@ -32,10 +32,10 @@ const CARD_LEVELS = [
 ];
 
 const SEQ_LEVELS = [
-  "6 3 8", 
-  "나무 사과 자동차", 
-  "2 7 1 9", 
-  "바다 구름 자전거 피아노", 
+  "6 3 8",
+  "나무 사과 자동차",
+  "2 7 1 9",
+  "바다 구름 자전거 피아노",
   "4 9 2 8 5"
 ];
 
@@ -56,6 +56,7 @@ function calculateAccuracy(target, input) {
 function App() {
   const [stage, setStage] = useState('home');
   const [testMode, setTestMode] = useState('');
+  const [isLargeText, setIsLargeText] = useState(false);
 
   const [birthYear, setBirthYear] = useState('');
   const [fortune, setFortune] = useState('');
@@ -177,7 +178,7 @@ function App() {
         setTimeout(() => {
           const endTime = Date.now();
           const timeTaken = Math.max(1, ((endTime - startTime) / 1000) - 6);
-          
+
           const newResults = [{ attempts: cardAttempts, timeTaken }];
           setResults(newResults);
           finishTest(newResults);
@@ -206,7 +207,7 @@ function App() {
     try {
       const { data, error } = await supabase.from('test_results').select('*');
       if (error) throw error;
-      
+
       if (!data || data.length === 0) {
         alert("아직 누적된 데이터가 없습니다.");
         setIsDownloading(false);
@@ -216,9 +217,9 @@ function App() {
       // 1. 헤더 추출
       const headers = Object.keys(data[0]);
       const csvRows = [];
-      
+
       csvRows.push(headers.join(',')); // 헤더 행 추가
-      
+
       // 2. 데이터 추출 및 CSV 형식 변환
       for (const row of data) {
         const values = headers.map(header => {
@@ -226,7 +227,7 @@ function App() {
           if (val === null || val === undefined) return '';
           if (typeof val === 'object') {
             const stringVal = JSON.stringify(val).replace(/"/g, '""');
-            return `"${stringVal}"`; 
+            return `"${stringVal}"`;
           }
           if (typeof val === 'string' && (val.includes(',') || val.includes('\n'))) {
             return `"${val}"`;
@@ -237,7 +238,7 @@ function App() {
       }
 
       // 우회전 시 엑셀에서 한글이 깨지지 않게 BOM(FEFF) 추가
-      const csvContent = "\uFEFF" + csvRows.join('\n'); 
+      const csvContent = "\uFEFF" + csvRows.join('\n');
       const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
       const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
@@ -266,7 +267,7 @@ function App() {
     setUserInput('');
     setTranscript('');
     setResults([]);
-    
+
     if (testMode === 'card') {
       setCardLevel(0);
       setCardAttempts(0);
@@ -289,9 +290,9 @@ function App() {
   const handleSeqSubmit = () => {
     const target = SEQ_LEVELS[seqLevel].replace(/\s/g, '');
     const user = seqInput.replace(/\s/g, '');
-    
+
     setSeqAttempts(prev => prev + 1);
-    
+
     if (target === user) {
       setSeqInput('');
       const next = seqLevel + 1;
@@ -314,7 +315,7 @@ function App() {
   const handleSeqSkip = () => {
     setSeqAttempts(prev => prev + 1);
     setSeqErrors(prev => prev + 2); // 스킵 시 기본 패널티(오답 2회 처리)
-    
+
     setSeqInput('');
     const next = seqLevel + 1;
     if (next < SEQ_LEVELS.length) {
@@ -457,7 +458,7 @@ function App() {
         const speedScore = Math.min(100, (cpm / 120) * 100);
         // 정확도 70%, 타건 속도 30%를 반영하여 0~100점 사이의 세밀한 종합 점수 산출
         let comprehensiveScore = Math.round((accuracy * 0.7) + (speedScore * 0.3));
-        
+
         // 타자 검사 (기준점: 난이도 1.0)
         let normalizedTime = totalTime * 1.0;
         let normalizedScore = Math.min(100, comprehensiveScore);
@@ -490,7 +491,7 @@ function App() {
 
         // 정확도를 기본으로 두고, 머뭇거림(1회당 -5점)과 단어 반복(1회당 -5점)을 감점 요인으로 계산
         let comprehensiveScore = Math.round(avgAccuracy - (totalPauses * 5) - (totalRepeats * 5));
-        
+
         // 음성 검사 (기준점: 난이도 1.0)
         let normalizedTime = totalTime * 1.0;
         let normalizedScore = Math.max(0, Math.min(100, comprehensiveScore));
@@ -513,13 +514,13 @@ function App() {
         const timeTaken = result.timeTaken;
         const attempts = result.attempts;
         const errors = Math.max(0, attempts - 18);
-        
+
         let score = 100;
         score -= errors * 5;
         if (timeTaken > 60) {
           score -= (timeTaken - 60) * 0.5;
         }
-        
+
         // 카드 뒤집기 검사 (매우 어려운 난이도: 시간 보정 x0.35, 점수 추가 보정)
         let normalizedTime = timeTaken * 0.35;
         let normalizedScore = Math.max(0, Math.min(100, Math.round(score + 10))); // 난이도를 감안하여 점수 +10 보정
@@ -545,7 +546,7 @@ function App() {
         let score = 100;
         score -= errors * 10;
         if (timeTaken > 30) score -= (timeTaken - 30) * 1;
-        
+
         // 순서 기억 검사 (어려운 난이도: 시간 보정 x0.5, 점수 추가 보정)
         let normalizedTime = timeTaken * 0.5;
         let normalizedScore = Math.max(0, Math.min(100, Math.round(score + 5))); // 난이도를 감안하여 점수 +5 보정
@@ -674,7 +675,7 @@ function App() {
       const result = results[0];
       const attempts = result ? result.attempts : 0;
       const timeTaken = result ? result.timeTaken : 0;
-      
+
       const errors = Math.max(0, attempts - 18);
       let score = 100;
       score -= errors * 5;
@@ -717,7 +718,7 @@ function App() {
       const result = results[0] || { errors: 0, timeTaken: 0 };
       const errors = result.errors;
       const timeTaken = result.timeTaken;
-      
+
       let score = 100 - (errors * 10);
       if (timeTaken > 30) score -= (timeTaken - 30) * 1;
       score = Math.max(0, Math.min(100, Math.round(score)));
@@ -768,7 +769,29 @@ function App() {
   };
 
   return (
-    <div className="app-container fade-in">
+    <div className={`app-container fade-in ${isLargeText ? 'large-text-mode' : ''}`}>
+      {/* 큰글씨 모드 토글 버튼 */}
+      <div style={{ position: 'absolute', top: '20px', right: '20px', zIndex: 100 }}>
+        <button 
+          onClick={() => setIsLargeText(!isLargeText)}
+          style={{
+            padding: '10px 16px',
+            borderRadius: '20px',
+            border: '3px solid var(--primary)',
+            background: isLargeText ? 'var(--primary)' : 'white',
+            color: isLargeText ? 'white' : 'var(--primary)',
+            fontWeight: '800',
+            fontSize: '18px',
+            cursor: 'pointer',
+            boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px'
+          }}
+        >
+          {isLargeText ? '🔍 일반 모드' : '🔎 큰글씨 모드'}
+        </button>
+      </div>
 
       {stage === 'home' && (
         <div className="center-content fade-in">
@@ -802,9 +825,9 @@ function App() {
             <button className="btn" onClick={() => setStage('select-mode')} style={{ padding: '30px 20px', fontSize: '32px', width: '100%' }}>
               검사 체험하기 👉
             </button>
-            
-            <button 
-              onClick={handleAdminClick} 
+
+            <button
+              onClick={handleAdminClick}
               style={{ marginTop: '25px', background: 'transparent', border: 'none', color: '#aaaaaa', fontSize: '14px', cursor: 'pointer', outline: 'none', padding: '10px' }}
             >
               관리자 모드
@@ -815,42 +838,46 @@ function App() {
 
       {/* Admin Login Stage */}
       {stage === 'admin-login' && (
-        <div className="center-content fade-in" style={{ justifyContent: 'center', position: 'relative' }}>
-          <div style={{ width: '100%', position: 'absolute', top: '20px', left: '20px' }}>
+        <div className="fade-in" style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+          <div style={{ width: '100%' }}>
             <button className="back-btn" onClick={() => setStage('home')}>← 이전 화면</button>
           </div>
-          <div className="solid-card" style={{ maxWidth: '400px', width: '100%', margin: '0 auto', textAlign: 'center' }}>
-            <h2>관리자 메뉴</h2>
-            <p style={{ color: 'var(--text-light)', marginBottom: '30px', fontSize: '18px' }}>접근 권한을 위해 비밀번호를 입력해주세요.</p>
-            <input 
-              type="password" 
-              className="typing-input" 
-              value={adminPassword} 
-              onChange={(e) => setAdminPassword(e.target.value)} 
-              placeholder="비밀번호"
-              style={{ textAlign: 'center', marginBottom: '20px', letterSpacing: '4px' }}
-              onKeyDown={(e) => { if (e.key === 'Enter') handleAdminSubmit(); }}
-            />
-            <button className="btn" onClick={handleAdminSubmit}>확인</button>
+          <div className="center-content" style={{ flex: 1, justifyContent: 'center' }}>
+            <div className="solid-card" style={{ maxWidth: '400px', width: '100%', margin: '0 auto', textAlign: 'center' }}>
+              <h2>관리자 메뉴</h2>
+              <p style={{ color: 'var(--text-light)', marginBottom: '30px', fontSize: '18px' }}>접근 권한을 위해 비밀번호를 입력해주세요.</p>
+              <input
+                type="password"
+                className="typing-input"
+                value={adminPassword}
+                onChange={(e) => setAdminPassword(e.target.value)}
+                placeholder="비밀번호"
+                style={{ textAlign: 'center', marginBottom: '20px', letterSpacing: '4px' }}
+                onKeyDown={(e) => { if (e.key === 'Enter') handleAdminSubmit(); }}
+              />
+              <button className="btn" onClick={handleAdminSubmit}>확인</button>
+            </div>
           </div>
         </div>
       )}
 
       {/* Admin Dashboard */}
       {stage === 'admin' && (
-        <div className="center-content fade-in" style={{ justifyContent: 'center', position: 'relative' }}>
-          <div style={{ width: '100%', position: 'absolute', top: '20px', left: '20px' }}>
+        <div className="fade-in" style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+          <div style={{ width: '100%' }}>
             <button className="back-btn" onClick={() => setStage('home')}>← 처음으로</button>
           </div>
-          <div className="solid-card" style={{ maxWidth: '450px', width: '100%', margin: '0 auto', textAlign: 'center' }}>
-            <div className="header-icon" style={{ fontSize: '50px', width: '80px', height: '80px', background: '#E3F2FD', color: '#1976D2', borderColor: '#1976D2' }}>📊</div>
-            <h2>데이터 관리실</h2>
-            <p style={{ color: 'var(--text-dark)', marginBottom: '40px', fontSize: '20px' }}>
-              현재까지 Supabase DB에 누적된 어르신들의 <strong>모든 검사 데이터</strong>를 엑셀(CSV) 파일 형식으로 즉시 다운로드하실 수 있습니다.
-            </p>
-            <button className="btn" onClick={handleDownloadCSV} disabled={isDownloading}>
-              {isDownloading ? '데이터 생성 중...' : '결과 다운로드 (CSV) 📥'}
-            </button>
+          <div className="center-content" style={{ flex: 1, justifyContent: 'center' }}>
+            <div className="solid-card" style={{ maxWidth: '450px', width: '100%', margin: '0 auto', textAlign: 'center' }}>
+              <div className="header-icon" style={{ fontSize: '50px', width: '80px', height: '80px', background: '#E3F2FD', color: '#1976D2', borderColor: '#1976D2' }}>📊</div>
+              <h2>데이터 관리실</h2>
+              <p style={{ color: 'var(--text-dark)', marginBottom: '40px', fontSize: '20px' }}>
+                현재까지 Supabase DB에 누적된 어르신들의 <strong>모든 검사 데이터</strong>를 엑셀(CSV) 파일 형식으로 즉시 다운로드하실 수 있습니다.
+              </p>
+              <button className="btn" onClick={handleDownloadCSV} disabled={isDownloading}>
+                {isDownloading ? '데이터 생성 중...' : '결과 다운로드 (CSV) 📥'}
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -1058,15 +1085,15 @@ function App() {
               현재 단계: {cardLevel + 1} / 3
             </div>
           </div>
-          
+
           <div className="card-grid">
             {cards.map(card => {
               const isFlipped = showingInitial || flippedCards.includes(card.id) || matchedCards.includes(card.id);
               const isMatched = matchedCards.includes(card.id);
-              
+
               return (
-                <div 
-                  key={card.id} 
+                <div
+                  key={card.id}
                   className={`game-card ${isFlipped ? 'flipped' : ''} ${isMatched ? 'matched' : ''}`}
                   onClick={() => handleCardClick(card.id)}
                 >
@@ -1083,9 +1110,9 @@ function App() {
             })}
           </div>
           <div style={{ margin: '30px 0', textAlign: 'center', width: '100%' }}>
-             <p style={{ fontSize: '24px', fontWeight: 'bold' }}>
-               시도: {cardAttempts}회
-             </p>
+            <p style={{ fontSize: '24px', fontWeight: 'bold' }}>
+              시도: {cardAttempts}회
+            </p>
           </div>
         </div>
       )}
@@ -1171,9 +1198,9 @@ function App() {
             <p style={{ fontSize: '26px', fontWeight: 'bold', color: 'var(--primary-dark)', margin: 0 }}>
               {testMode === 'typing'
                 ? '입력하신 글자를 바탕으로 확인하고 있습니다. 잠시만 기다려주세요.'
-                : testMode === 'voice' 
-                ? '녹음된 목소리를 바탕으로 확인하고 있습니다. 잠시만 기다려주세요.'
-                : '게임 결과를 바탕으로 확인하고 있습니다. 잠시만 기다려주세요.'}
+                : testMode === 'voice'
+                  ? '녹음된 목소리를 바탕으로 확인하고 있습니다. 잠시만 기다려주세요.'
+                  : '게임 결과를 바탕으로 확인하고 있습니다. 잠시만 기다려주세요.'}
             </p>
           </div>
         </div>
