@@ -576,184 +576,17 @@ function App() {
 
   // 결과 계산 뷰
   const renderResult = () => {
-    if (testMode === 'typing') {
-      let totalErrors = 0;
-      let totalLength = 0;
-      let totalTime = 0;
-
-      results.forEach(r => {
-        totalErrors += r.errorCount;
-        totalLength += r.length;
-        totalTime += r.timeTaken;
-      });
-
-      const accuracy = Math.max(0, 100 - (totalErrors / totalLength) * 100).toFixed(1);
-      const estimatedStrokes = totalLength * 2.5;
-      const timeInMinutes = Math.max(0.1, totalTime / 60);
-      const cpm = Math.round(estimatedStrokes / timeInMinutes);
-
-      let rating = "건강합니다";
-      let message = "현재 아주 건강한 인지 능력을 보여주고 계십니다. 꾸준한 두뇌 활동으로 늘 건강을 유지하세요!";
-      if (accuracy < 85 || cpm < 100) {
-        rating = "주의가 필요합니다";
-        message = "집중력이나 속도가 다소 떨어졌을 수 있습니다. 편안한 마음으로 화면을 보고 다시 한번 연습해 보세요.";
-      }
-
-      return (
-        <React.Fragment>
-          <div className="solid-card" style={{ textAlign: 'center', backgroundColor: rating === '주의가 필요합니다' ? '#FFEBEE' : 'var(--primary-light)', borderColor: rating === '주의가 필요합니다' ? 'var(--danger)' : 'var(--primary)' }}>
-            <h2 style={{ color: rating === '주의가 필요합니다' ? 'var(--danger)' : 'var(--primary)', fontSize: '40px', fontWeight: '800' }}>{rating}</h2>
-            <p style={{ color: 'var(--text-dark)', marginTop: '20px' }}>{message}</p>
-          </div>
-          <div className="stats-grid">
-            <div className="stat-card">
-              <div className="stat-value">{accuracy}%</div>
-              <div className="stat-label">정확도</div>
-            </div>
-            <div className="stat-card">
-              <div className="stat-value">{cpm}</div>
-              <div className="stat-label">타수 (분당)</div>
-            </div>
-            <div className="stat-card" style={{ gridColumn: '1 / -1' }}>
-              <div className="stat-value" style={{ fontSize: '24px' }}>{totalTime.toFixed(1)}초</div>
-              <div className="stat-label">총 소요 시간</div>
-            </div>
-          </div>
-        </React.Fragment>
-      );
-    } else if (testMode === 'voice') {
-      // Voice Results
-      let totalTime = 0;
-      let totalAccuracy = 0;
-      let totalPauses = 0;
-      let totalRepeats = 0;
-
-      results.forEach(r => {
-        totalTime += r.timeTaken;
-        totalAccuracy += r.accuracy;
-        totalPauses += r.unexpectedPauses;
-        totalRepeats += r.wordRepetitions;
-      });
-
-      const avgAccuracy = (totalAccuracy / results.length).toFixed(1);
-
-      let rating = "건강합니다";
-      let message = "발음이 명확하고 말하는 속도가 안정적입니다. 아주 건강한 언어 능력을 보여주고 계십니다.";
-
-      if (avgAccuracy < 70 || totalPauses > 3 || totalRepeats > 2) {
-        rating = "주의가 필요합니다";
-        message = "말씀 중간에 멈춤이나 반복이 감지되었습니다. 주변의 가족이나 전문가와 가벼운 대화를 나누어보시는 것도 큰 도움이 됩니다.";
-      }
-
-      return (
-        <React.Fragment>
-          <div className="solid-card" style={{ textAlign: 'center', backgroundColor: rating === '주의가 필요합니다' ? '#FFEBEE' : 'var(--primary-light)', borderColor: rating === '주의가 필요합니다' ? 'var(--danger)' : 'var(--primary)' }}>
-            <h2 style={{ color: rating === '주의가 필요합니다' ? 'var(--danger)' : 'var(--primary)', fontSize: '40px', fontWeight: '800' }}>{rating}</h2>
-            <p style={{ color: 'var(--text-dark)', marginTop: '20px' }}>{message}</p>
-          </div>
-          <div className="stats-grid">
-            <div className="stat-card">
-              <div className="stat-value">{avgAccuracy}%</div>
-              <div className="stat-label">발음 정확도</div>
-            </div>
-            <div className="stat-card">
-              <div className="stat-value">{totalTime.toFixed(1)}s</div>
-              <div className="stat-label">발화 소요 시간</div>
-            </div>
-            <div className="stat-card danger">
-              <div className="stat-value">{totalPauses}회</div>
-              <div className="stat-label">머뭇거림/지연</div>
-            </div>
-            <div className="stat-card warning">
-              <div className="stat-value">{totalRepeats}회</div>
-              <div className="stat-label">단어 반복 및 어눌함</div>
-            </div>
-          </div>
-        </React.Fragment>
-      );
-    } else if (testMode === 'card') {
-      const result = results[0];
-      const attempts = result ? result.attempts : 0;
-      const timeTaken = result ? result.timeTaken : 0;
-
-      const errors = Math.max(0, attempts - 18);
-      let score = 100;
-      score -= errors * 5;
-      if (timeTaken > 60) {
-        score -= (timeTaken - 60) * 0.5;
-      }
-      score = Math.max(0, Math.min(100, Math.round(score)));
-
-      let rating = "건강합니다";
-      let message = "그림의 위치를 잘 기억하고 정확하게 맞추셨습니다. 집중력과 기억력이 훌륭하십니다!";
-
-      if (score < 70 || attempts >= 35) {
-        rating = "주의가 필요합니다";
-        message = "난이도가 올라갈수록 위치를 기억하는 데 다소 어려움이 있으셨습니다. 꾸준한 두뇌 활동 게임을 통해 기억력을 훈련하시면 큰 도움이 됩니다.";
-      }
-
-      return (
-        <React.Fragment>
-          <div className="solid-card" style={{ textAlign: 'center', backgroundColor: rating === '주의가 필요합니다' ? '#FFEBEE' : 'var(--primary-light)', borderColor: rating === '주의가 필요합니다' ? 'var(--danger)' : 'var(--primary)' }}>
-            <h2 style={{ color: rating === '주의가 필요합니다' ? 'var(--danger)' : 'var(--primary)', fontSize: '40px', fontWeight: '800' }}>{rating}</h2>
-            <p style={{ color: 'var(--text-dark)', marginTop: '20px' }}>{message}</p>
-          </div>
-          <div className="stats-grid">
-            <div className="stat-card">
-              <div className="stat-value">{score}점</div>
-              <div className="stat-label">종합 점수</div>
-            </div>
-            <div className="stat-card warning">
-              <div className="stat-value">{attempts}회</div>
-              <div className="stat-label">시도 횟수</div>
-            </div>
-            <div className="stat-card" style={{ gridColumn: '1 / -1' }}>
-              <div className="stat-value" style={{ fontSize: '24px' }}>{timeTaken.toFixed(1)}초</div>
-              <div className="stat-label">총 소요 시간</div>
-            </div>
-          </div>
-        </React.Fragment>
-      );
-    } else if (testMode === 'sequence') {
-      const result = results[0] || { errors: 0, timeTaken: 0 };
-      const errors = result.errors;
-      const timeTaken = result.timeTaken;
-
-      let score = 100 - (errors * 10);
-      if (timeTaken > 30) score -= (timeTaken - 30) * 1;
-      score = Math.max(0, Math.min(100, Math.round(score)));
-
-      let rating = "건강합니다";
-      let message = "숫자와 단어를 순서대로 아주 정확하게 기억하셨네요. 단기 기억력이 매우 훌륭하십니다!";
-
-      if (score < 70 || errors >= 5) {
-        rating = "주의가 필요합니다";
-        message = "기억하려 애쓰셨지만 순서가 다소 헷갈리셨던 것 같습니다. 단기 기억력 향상을 위해 간단한 암기 훈련을 꾸준히 해보세요.";
-      }
-
-      return (
-        <React.Fragment>
-          <div className="solid-card" style={{ textAlign: 'center', backgroundColor: rating === '주의가 필요합니다' ? '#FFEBEE' : 'var(--primary-light)', borderColor: rating === '주의가 필요합니다' ? 'var(--danger)' : 'var(--primary)' }}>
-            <h2 style={{ color: rating === '주의가 필요합니다' ? 'var(--danger)' : 'var(--primary)', fontSize: '40px', fontWeight: '800' }}>{rating}</h2>
-            <p style={{ color: 'var(--text-dark)', marginTop: '20px' }}>{message}</p>
-          </div>
-          <div className="stats-grid">
-            <div className="stat-card">
-              <div className="stat-value">{score}점</div>
-              <div className="stat-label">종합 점수</div>
-            </div>
-            <div className="stat-card warning">
-              <div className="stat-value">{errors}회</div>
-              <div className="stat-label">오답 횟수</div>
-            </div>
-            <div className="stat-card" style={{ gridColumn: '1 / -1' }}>
-              <div className="stat-value" style={{ fontSize: '24px' }}>{timeTaken.toFixed(1)}초</div>
-              <div className="stat-label">입력 소요 시간</div>
-            </div>
-          </div>
-        </React.Fragment>
-      );
-    }
+    return (
+      <React.Fragment>
+        <div className="solid-card" style={{ textAlign: 'center', backgroundColor: 'var(--primary-light)', borderColor: 'var(--primary)' }}>
+          <h2 style={{ color: 'var(--primary)', fontSize: '40px', fontWeight: '800' }}>고생하셨습니다!!</h2>
+          <p style={{ color: 'var(--text-dark)', marginTop: '20px', fontSize: '18px' }}>
+            검사를 무사히 마치셨습니다. 꾸준한 두뇌 활동으로 늘 건강을 유지하세요!<br/>
+            (검사 결과는 안전하게 서버에 저장되었습니다.)
+          </p>
+        </div>
+      </React.Fragment>
+    );
   };
 
   const renderTargetSentence = () => {
@@ -772,7 +605,7 @@ function App() {
     <div className={`app-container fade-in ${isLargeText ? 'large-text-mode' : ''}`}>
       {/* 큰글씨 모드 토글 버튼 */}
       <div style={{ position: 'absolute', top: '20px', right: '20px', zIndex: 100 }}>
-        <button 
+        <button
           onClick={() => setIsLargeText(!isLargeText)}
           style={{
             padding: '10px 16px',
