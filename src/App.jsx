@@ -99,6 +99,7 @@ function App() {
   // Member States
   const [loggedInMember, setLoggedInMember] = useState(null);
   const [memberLoginId, setMemberLoginId] = useState('');
+  const [memberPassword, setMemberPassword] = useState('');
   const [isMemberDownloading, setIsMemberDownloading] = useState(false);
 
   const setupCardLevel = (levelIndex) => {
@@ -194,12 +195,13 @@ function App() {
 
   // Member Handlers
   const handleMemberSubmit = () => {
-    if (memberLoginId.trim() !== '') {
+    if (memberLoginId.trim() === 'uglygw0' && memberPassword === '1234') {
       setLoggedInMember(memberLoginId.trim());
       setStage('home');
       setMemberLoginId('');
+      setMemberPassword('');
     } else {
-      alert("아이디를 입력해주세요.");
+      alert("아이디 또는 비밀번호가 잘못되었습니다.");
     }
   };
 
@@ -766,13 +768,22 @@ function App() {
           <div className="center-content" style={{ flex: 1, justifyContent: 'center' }}>
             <div className="solid-card" style={{ maxWidth: '400px', width: '100%', margin: '0 auto', textAlign: 'center' }}>
               <h2>회원 로그인</h2>
-              <p style={{ color: 'var(--text-light)', marginBottom: '30px', fontSize: '18px' }}>사용하시는 아이디를 입력해주세요.</p>
+              <p style={{ color: 'var(--text-light)', marginBottom: '30px', fontSize: '18px' }}>사용하시는 아이디와 비밀번호를 입력해주세요.</p>
               <input
                 type="text"
                 className="typing-input"
                 value={memberLoginId}
                 onChange={(e) => setMemberLoginId(e.target.value)}
                 placeholder="아이디"
+                style={{ textAlign: 'center', marginBottom: '15px' }}
+                onKeyDown={(e) => { if (e.key === 'Enter') handleMemberSubmit(); }}
+              />
+              <input
+                type="password"
+                className="typing-input"
+                value={memberPassword}
+                onChange={(e) => setMemberPassword(e.target.value)}
+                placeholder="비밀번호"
                 style={{ textAlign: 'center', marginBottom: '20px' }}
                 onKeyDown={(e) => { if (e.key === 'Enter') handleMemberSubmit(); }}
               />
