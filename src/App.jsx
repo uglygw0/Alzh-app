@@ -541,8 +541,16 @@ function App() {
           raw_errors: totalErrors,
           details: { estimatedStrokes, cpm, accuracy: parseFloat(accuracy.toFixed(1)) }
         };
-        await supabase.from('test_results').insert([commonData]);
-        if (loggedInMember) await supabase.from('member_test_results').insert([{ ...commonData, member_id: loggedInMember }]);
+        const { error: commonError } = await supabase.from('test_results').insert([commonData]);
+        if (commonError) console.error("test_results error:", commonError);
+        
+        if (loggedInMember) {
+          const { error: memberError } = await supabase.from('member_test_results').insert([{ ...commonData, member_id: loggedInMember }]);
+          if (memberError) {
+            console.error("member_test_results error:", memberError);
+            alert(`회원 DB 저장 실패: ${memberError.message}\n(대시보드의 RLS 설정 또는 컬럼명이 정확한지 확인해 주세요.)`);
+          }
+        }
       } else if (testMode === 'voice') {
         let totalTime = 0;
         let totalAccuracy = 0;
@@ -574,8 +582,16 @@ function App() {
           raw_errors: totalPauses + totalRepeats,
           details: { unexpectedPauses: totalPauses, wordRepetitions: totalRepeats, accuracy: parseFloat(avgAccuracy.toFixed(1)) }
         };
-        await supabase.from('test_results').insert([commonData]);
-        if (loggedInMember) await supabase.from('member_test_results').insert([{ ...commonData, member_id: loggedInMember }]);
+        const { error: commonError } = await supabase.from('test_results').insert([commonData]);
+        if (commonError) console.error("test_results error:", commonError);
+
+        if (loggedInMember) {
+          const { error: memberError } = await supabase.from('member_test_results').insert([{ ...commonData, member_id: loggedInMember }]);
+          if (memberError) {
+            console.error("member_test_results error:", memberError);
+            alert(`회원 DB 저장 실패: ${memberError.message}\n(대시보드의 RLS 설정 또는 컬럼명이 정확한지 확인해 주세요.)`);
+          }
+        }
       } else if (testMode === 'card') {
         const result = finalResults[0];
         const timeTaken = result.timeTaken;
