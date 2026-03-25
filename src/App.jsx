@@ -619,8 +619,16 @@ function App() {
           raw_errors: errors,
           details: { attempts }
         };
-        await supabase.from('test_results').insert([commonData]);
-        if (loggedInMember) await supabase.from('member_test_results').insert([{ ...commonData, member_id: loggedInMember }]);
+        const { error: commonError } = await supabase.from('test_results').insert([commonData]);
+        if (commonError) console.error("test_results error:", commonError);
+
+        if (loggedInMember) {
+          const { error: memberError } = await supabase.from('member_test_results').insert([{ ...commonData, member_id: loggedInMember }]);
+          if (memberError) {
+            console.error("member_test_results error:", memberError);
+            alert(`회원 DB 저장 실패: ${memberError.message}\n(대시보드의 RLS 설정 또는 컬럼명이 정확한지 확인해 주세요.)`);
+          }
+        }
       } else if (testMode === 'sequence') {
         const result = finalResults[0];
         const errors = result.errors;
@@ -645,8 +653,16 @@ function App() {
           raw_errors: errors,
           details: { attempts: result.attempts }
         };
-        await supabase.from('test_results').insert([commonData]);
-        if (loggedInMember) await supabase.from('member_test_results').insert([{ ...commonData, member_id: loggedInMember }]);
+        const { error: commonError } = await supabase.from('test_results').insert([commonData]);
+        if (commonError) console.error("test_results error:", commonError);
+
+        if (loggedInMember) {
+          const { error: memberError } = await supabase.from('member_test_results').insert([{ ...commonData, member_id: loggedInMember }]);
+          if (memberError) {
+            console.error("member_test_results error:", memberError);
+            alert(`회원 DB 저장 실패: ${memberError.message}\n(대시보드의 RLS 설정 또는 컬럼명이 정확한지 확인해 주세요.)`);
+          }
+        }
       }
     } catch (error) {
       console.error('Error saving to Supabase:', error);
