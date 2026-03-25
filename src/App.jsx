@@ -96,6 +96,11 @@ function App() {
   const [adminPassword, setAdminPassword] = useState('');
   const [isDownloading, setIsDownloading] = useState(false);
 
+  // Member States
+  const [loggedInMember, setLoggedInMember] = useState(null);
+  const [memberLoginId, setMemberLoginId] = useState('');
+  const [isMemberDownloading, setIsMemberDownloading] = useState(false);
+
   const setupCardLevel = (levelIndex) => {
     const images = CARD_LEVELS[levelIndex];
     const deck = [...images, ...images]
@@ -186,6 +191,66 @@ function App() {
       }
     }
   }, [matchedCards, stage, testMode, showingInitial, cards.length, cardLevel]);
+
+  // Member Handlers
+  const handleMemberSubmit = () => {
+    if (memberLoginId.trim() !== '') {
+      setLoggedInMember(memberLoginId.trim());
+      setStage('home');
+      setMemberLoginId('');
+    } else {
+      alert("아이디를 입력해주세요.");
+    }
+  };
+
+  const handleMemberDownloadCSV = async () => {
+    setIsMemberDownloading(true);
+    try {
+      const { data, error } = await supabase.from('member_test_results').select('*').eq('member_id', loggedInMember);
+      if (error) throw error;
+
+      if (!data || data.length === 0) {
+        alert("아직 누적된 내 검사 데이터가 없습니다.");
+        setIsMemberDownloading(false);
+        return;
+      }
+
+      const headers = Object.keys(data[0]);
+      const csvRows = [];
+      csvRows.push(headers.join(','));
+
+      for (const row of data) {
+        const values = headers.map(header => {
+          const val = row[header];
+          if (val === null || val === undefined) return '';
+          if (typeof val === 'object') {
+            const stringVal = JSON.stringify(val).replace(/"/g, '""');
+            return `"${stringVal}"`;
+          }
+          if (typeof val === 'string' && (val.includes(',') || val.includes('\n'))) {
+            return `"${val}"`;
+          }
+          return val;
+        });
+        csvRows.push(values.join(','));
+      }
+
+      const csvContent = "\uFEFF" + csvRows.join('\n');
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.setAttribute("href", url);
+      link.setAttribute("download", `my_test_results_${loggedInMember}_${new Date().toISOString().split('T')[0]}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } catch (err) {
+      console.error(err);
+      alert("데이터를 가져오는 중 오류가 발생했습니다.");
+    } finally {
+      setIsMemberDownloading(false);
+    }
+  };
 
   // Admin Handlers
   const handleAdminClick = () => {
@@ -464,18 +529,18 @@ function App() {
         let normalizedScore = Math.min(100, comprehensiveScore);
         const dbRating = normalizedScore.toString();
 
-        await supabase.from('test_results').insert([
-          {
-            test_type: 'typing',
-            birth_year: parseInt(birthYear, 10) || null,
-            score: parseFloat(normalizedScore.toFixed(1)),
-            time_taken: parseFloat(normalizedTime.toFixed(1)),
-            rating: dbRating,
-            raw_time: parseFloat(totalTime.toFixed(1)),
-            raw_errors: totalErrors,
-            details: { estimatedStrokes, cpm, accuracy: parseFloat(accuracy.toFixed(1)) }
-          }
-        ]);
+        const commonData = {
+          test_type: 'typing',
+          birth_year: parseInt(birthYear, 10) || null,
+          score: parseFloat(normalizedScore.toFixed(1)),
+          time_taken: parseFloat(normalizedTime.toFixed(1)),
+          rating: dbRating,
+          raw_time: parseFloat(totalTime.toFixed(1)),
+          raw_errors: totalErrors,
+          details: { estimatedStrokes, cpm, accuracy: parseFloat(accuracy.toFixed(1)) }
+        };
+        await supabase.from('test_results').insert([commonData]);
+        if (loggedInMember) await supabase.from('member_test_results').insert([{ ...commonData, member_id: loggedInMember }]);
       } else if (testMode === 'voice') {
         let totalTime = 0;
         let totalAccuracy = 0;
@@ -497,18 +562,18 @@ function App() {
         let normalizedScore = Math.max(0, Math.min(100, comprehensiveScore));
         const dbRating = normalizedScore.toString();
 
-        await supabase.from('test_results').insert([
-          {
-            test_type: 'voice',
-            birth_year: parseInt(birthYear, 10) || null,
-            score: parseFloat(normalizedScore.toFixed(1)),
-            time_taken: parseFloat(normalizedTime.toFixed(1)),
-            rating: dbRating,
-            raw_time: parseFloat(totalTime.toFixed(1)),
-            raw_errors: totalPauses + totalRepeats,
-            details: { unexpectedPauses: totalPauses, wordRepetitions: totalRepeats, accuracy: parseFloat(avgAccuracy.toFixed(1)) }
-          }
-        ]);
+        const commonData = {
+          test_type: 'voice',
+          birth_year: parseInt(birthYear, 10) || null,
+          score: parseFloat(normalizedScore.toFixed(1)),
+          time_taken: parseFloat(normalizedTime.toFixed(1)),
+          rating: dbRating,
+          raw_time: parseFloat(totalTime.toFixed(1)),
+          raw_errors: totalPauses + totalRepeats,
+          details: { unexpectedPauses: totalPauses, wordRepetitions: totalRepeats, accuracy: parseFloat(avgAccuracy.toFixed(1)) }
+        };
+        await supabase.from('test_results').insert([commonData]);
+        if (loggedInMember) await supabase.from('member_test_results').insert([{ ...commonData, member_id: loggedInMember }]);
       } else if (testMode === 'card') {
         const result = finalResults[0];
         const timeTaken = result.timeTaken;
@@ -526,18 +591,18 @@ function App() {
         let normalizedScore = Math.max(0, Math.min(100, Math.round(score + 10))); // 난이도를 감안하여 점수 +10 보정
         const dbRating = normalizedScore.toString();
 
-        await supabase.from('test_results').insert([
-          {
-            test_type: 'card',
-            birth_year: parseInt(birthYear, 10) || null,
-            score: parseFloat(normalizedScore.toFixed(1)),
-            time_taken: parseFloat(normalizedTime.toFixed(1)),
-            rating: dbRating,
-            raw_time: parseFloat(timeTaken.toFixed(1)),
-            raw_errors: errors,
-            details: { attempts }
-          }
-        ]);
+        const commonData = {
+          test_type: 'card',
+          birth_year: parseInt(birthYear, 10) || null,
+          score: parseFloat(normalizedScore.toFixed(1)),
+          time_taken: parseFloat(normalizedTime.toFixed(1)),
+          rating: dbRating,
+          raw_time: parseFloat(timeTaken.toFixed(1)),
+          raw_errors: errors,
+          details: { attempts }
+        };
+        await supabase.from('test_results').insert([commonData]);
+        if (loggedInMember) await supabase.from('member_test_results').insert([{ ...commonData, member_id: loggedInMember }]);
       } else if (testMode === 'sequence') {
         const result = finalResults[0];
         const errors = result.errors;
@@ -552,18 +617,18 @@ function App() {
         let normalizedScore = Math.max(0, Math.min(100, Math.round(score + 5))); // 난이도를 감안하여 점수 +5 보정
         const dbRating = normalizedScore.toString();
 
-        await supabase.from('test_results').insert([
-          {
-            test_type: 'sequence',
-            birth_year: parseInt(birthYear, 10) || null,
-            score: parseFloat(normalizedScore.toFixed(1)),
-            time_taken: parseFloat(normalizedTime.toFixed(1)),
-            rating: dbRating,
-            raw_time: parseFloat(timeTaken.toFixed(1)),
-            raw_errors: errors,
-            details: { attempts: result.attempts }
-          }
-        ]);
+        const commonData = {
+          test_type: 'sequence',
+          birth_year: parseInt(birthYear, 10) || null,
+          score: parseFloat(normalizedScore.toFixed(1)),
+          time_taken: parseFloat(normalizedTime.toFixed(1)),
+          rating: dbRating,
+          raw_time: parseFloat(timeTaken.toFixed(1)),
+          raw_errors: errors,
+          details: { attempts: result.attempts }
+        };
+        await supabase.from('test_results').insert([commonData]);
+        if (loggedInMember) await supabase.from('member_test_results').insert([{ ...commonData, member_id: loggedInMember }]);
       }
     } catch (error) {
       console.error('Error saving to Supabase:', error);
@@ -655,6 +720,29 @@ function App() {
           </div>
 
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: '100%' }}>
+            {loggedInMember ? (
+              <div className="solid-card" style={{ width: '100%', marginBottom: '20px', padding: '20px', textAlign: 'center', backgroundColor: '#e8f5e9', borderColor: '#4CAF50' }}>
+                <p style={{ fontSize: '24px', fontWeight: 'bold', margin: '0 0 15px 0', color: '#2E7D32' }}>👤 {loggedInMember}님 환영합니다!</p>
+                <div style={{ display: 'flex', gap: '10px', justifyContent: 'center' }}>
+                  <button className="btn" onClick={handleMemberDownloadCSV} disabled={isMemberDownloading} style={{ fontSize: '18px', padding: '15px 20px', backgroundColor: '#4CAF50' }}>
+                    {isMemberDownloading ? '가져오는 중...' : '다운로드 (엑셀) 📥'}
+                  </button>
+                  <button className="btn btn-secondary" onClick={() => setLoggedInMember(null)} style={{ fontSize: '18px', padding: '15px 20px' }}>
+                    로그아웃
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div style={{ width: '100%', textAlign: 'right', marginBottom: '10px' }}>
+                <button 
+                  onClick={() => setStage('member-login')}
+                  style={{ background: '#1976D2', color: 'white', border: 'none', padding: '10px 20px', borderRadius: '8px', fontSize: '18px', fontWeight: 'bold', cursor: 'pointer', boxShadow: '0 2px 4px rgba(0,0,0,0.1)' }}
+                >
+                  👤 회원 로그인
+                </button>
+              </div>
+            )}
+
             <button className="btn" onClick={() => setStage('select-mode')} style={{ padding: '30px 20px', fontSize: '32px', width: '100%' }}>
               검사 체험하기 👉
             </button>
@@ -665,6 +753,31 @@ function App() {
             >
               관리자 모드
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* Member Login Stage */}
+      {stage === 'member-login' && (
+        <div className="fade-in" style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+          <div style={{ width: '100%' }}>
+            <button className="back-btn" onClick={() => setStage('home')}>← 이전 화면</button>
+          </div>
+          <div className="center-content" style={{ flex: 1, justifyContent: 'center' }}>
+            <div className="solid-card" style={{ maxWidth: '400px', width: '100%', margin: '0 auto', textAlign: 'center' }}>
+              <h2>회원 로그인</h2>
+              <p style={{ color: 'var(--text-light)', marginBottom: '30px', fontSize: '18px' }}>사용하시는 아이디를 입력해주세요.</p>
+              <input
+                type="text"
+                className="typing-input"
+                value={memberLoginId}
+                onChange={(e) => setMemberLoginId(e.target.value)}
+                placeholder="아이디"
+                style={{ textAlign: 'center', marginBottom: '20px' }}
+                onKeyDown={(e) => { if (e.key === 'Enter') handleMemberSubmit(); }}
+              />
+              <button className="btn" onClick={handleMemberSubmit}>로그인</button>
+            </div>
           </div>
         </div>
       )}

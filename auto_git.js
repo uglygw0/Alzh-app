@@ -15,12 +15,12 @@ try {
       timeout = setTimeout(() => {
           // Check if there are changes to commit. If there are, commit them.
           const commitMsg = filename ? `Auto save: Updated ${filename}` : 'Auto save: File update';
-          exec(`git add . && git diff --cached --quiet || git commit -m "${commitMsg}"`, (error, stdout, stderr) => {
+          exec(`git add . && git diff --cached --quiet || git commit -m "${commitMsg}" && git push`, (error, stdout, stderr) => {
               if (error) return; // If there's an error (e.g., nothing to commit), ignore
               
               const output = stdout.trim();
               if (output && !output.includes('nothing to commit')) {
-                  console.log(`✅ [Git Auto-Save] Snapshot created for: ${filename || 'file changes'}`);
+                  console.log(`✅ [Git Auto-Save & Push] Snapshot deployed to remote for: ${filename || 'file changes'}`);
               }
           });
       }, 2000); 
