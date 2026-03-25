@@ -1,5 +1,22 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { supabase } from './supabaseClient';
+import {
+  ResponsiveContainer,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  Tooltip as RechartsTooltip,
+  CartesianGrid,
+  PieChart,
+  Pie,
+  Cell,
+  Legend,
+  LineChart,
+  Line,
+  AreaChart,
+  Area
+} from 'recharts';
 import './index.css';
 
 const SENTENCES = [
@@ -95,6 +112,8 @@ function App() {
   // Admin States
   const [adminPassword, setAdminPassword] = useState('');
   const [isDownloading, setIsDownloading] = useState(false);
+  const [adminStats, setAdminStats] = useState(null);
+  const [isAdminStatLoading, setIsAdminStatLoading] = useState(false);
 
   // Member States
   const [loggedInMember, setLoggedInMember] = useState(null);
@@ -322,6 +341,133 @@ function App() {
     }
   };
 
+  const fetchAdminStats = async () => {
+    setIsAdminStatLoading(true);
+    try {
+      let query = supabase.from('test_results').select('*');
+      
+      // 회원 로그인 상태면 내 데이터만 가저오기
+      if (loggedInMember) {
+        query = supabase.from('member_test_results').select('*').eq('member_id', loggedInMember);
+      }
+      
+      const { data, error } = await query;
+      if (error) throw error;
+      setAdminStats(data || []);
+      setStage('admin-analysis');
+    } catch (err) {
+      console.error(err);
+      alert("통계 데이터를 가져오는 중 오류가 발생했습니다.");
+    } finally {
+      setIsAdminStatLoading(false);
+    }
+  };
+
+  // 날짜별 추이 데이터 가공
+  const trendData = useMemo(() => {
+    if (!adminStats || adminStats.length === 0) return [];
+    
+    // 날짜별로 그룹화하여 평균 점수 계산
+    const groups = {};
+    adminStats.forEach(item => {
+      const date = new Date(item.created_at).toLocaleDateString();
+      if (!groups[date]) groups[date] = { date, score: 0, count: 0 };
+      groups[date].score += item.score;
+      groups[date].count += 1;
+    });
+
+    return Object.values(groups).map(g => ({
+      date: g.date,
+      score: Math.round(g.score / g.count)
+    })).sort((a, b) => new Date(a.date) - new Date(b.date));
+  }, [adminStats]);
+
+  // 전주 대비 비교 통계
+  const comparisonStats = useMemo(() => {
+    if (!adminStats || adminStats.length === 0) return null;
+
+    const now = new Date();
+    const oneWeekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+    const twoWeeksAgo = new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000);
+
+    const thisWeekItems = adminStats.filter(item => new Date(item.created_at) >= oneWeekAgo);
+    const lastWeekItems = adminStats.filter(item => {
+      const d = new Date(item.created_at);
+      return d >= twoWeeksAgo && d < oneWeekAgo;
+    });
+
+    const calcAvg = (items, key) => items.length === 0 ? 0 : items.reduce((sum, item) => sum + (item[key] || 0), 0) / items.length;
+
+    const thisWeekErrors = calcAvg(thisWeekItems, 'raw_errors');
+    const lastWeekErrors = calcAvg(lastWeekItems, 'raw_errors');
+    const thisWeekTime = calcAvg(thisWeekItems, 'raw_time');
+    const lastWeekTime = calcAvg(lastWeekItems, 'raw_time');
+
+    return {
+      errors: {
+        this: thisWeekErrors.toFixed(1),
+        last: lastWeekErrors.toFixed(1),
+        diff: (thisWeekErrors - lastWeekErrors).toFixed(1)
+      },
+      time: {
+        this: thisWeekTime.toFixed(1),
+        last: lastWeekTime.toFixed(1),
+        diff: (thisWeekTime - lastWeekTime).toFixed(1)
+      }
+    };
+  }, [adminStats]);
+
+  // 분석 데이터 가공
+  const chartData = useMemo(() => {
+    if (!adminStats || adminStats.length === 0) return [];
+    
+    const types = {
+      typing: { name: '글씨 치기', totalScore: 0, count: 0 },
+      voice: { name: '목소리 읽기', totalScore: 0, count: 0 },
+      card: { name: '그림 짝맞추기', totalScore: 0, count: 0 },
+      sequence: { name: '순서 기억', totalScore: 0, count: 0 },
+    };
+
+    adminStats.forEach(item => {
+      if (types[item.test_type]) {
+        types[item.test_type].totalScore += item.score;
+        types[item.test_type].count += 1;
+      }
+    });
+
+    return Object.keys(types).map(key => ({
+      name: types[key].name,
+      average: types[key].count > 0 ? Math.round(types[key].totalScore / types[key].count) : 0,
+      count: types[key].count
+    }));
+  }, [adminStats]);
+
+  const testDistributionData = useMemo(() => {
+    if (!adminStats || adminStats.length === 0) return [];
+    
+    const counts = {
+      typing: 0,
+      voice: 0,
+      card: 0,
+      sequence: 0,
+    };
+
+    adminStats.forEach(item => {
+      if (counts[item.test_type] !== undefined) {
+        counts[item.test_type]++;
+      }
+    });
+
+    const COLORS = ['#FF8042', '#0088FE', '#00C49F', '#FFBB28'];
+    const names = { typing: '글씨 치기', voice: '목소리 읽기', card: '그림 짝맞추기', sequence: '순서 기억' };
+
+    return Object.keys(counts).map((key, index) => ({
+      name: names[key],
+      value: counts[key],
+      color: COLORS[index]
+    }));
+  }, [adminStats]);
+
   // 공통 핸들러
   const handleSelectMode = (mode) => {
     setTestMode(mode);
@@ -543,7 +689,7 @@ function App() {
         };
         const { error: commonError } = await supabase.from('test_results').insert([commonData]);
         if (commonError) console.error("test_results error:", commonError);
-        
+
         if (loggedInMember) {
           const { error: memberError } = await supabase.from('member_test_results').insert([{ ...commonData, member_id: loggedInMember }]);
           if (memberError) {
@@ -680,7 +826,7 @@ function App() {
         <div className="solid-card" style={{ textAlign: 'center', backgroundColor: 'var(--primary-light)', borderColor: 'var(--primary)' }}>
           <h2 style={{ color: 'var(--primary)', fontSize: '40px', fontWeight: '800' }}>고생하셨습니다!!</h2>
           <p style={{ color: 'var(--text-dark)', marginTop: '20px', fontSize: '18px' }}>
-            검사를 무사히 마치셨습니다. 꾸준한 두뇌 활동으로 늘 건강을 유지하세요!<br/>
+            검사를 무사히 마치셨습니다. 꾸준한 두뇌 활동으로 늘 건강을 유지하세요!<br />
             (검사 결과는 안전하게 서버에 저장되었습니다.)
           </p>
         </div>
@@ -702,8 +848,20 @@ function App() {
 
   return (
     <div className={`app-container fade-in ${isLargeText ? 'large-text-mode' : ''}`}>
-      {/* 큰글씨 모드 토글 버튼 */}
-      <div style={{ position: 'absolute', top: '20px', right: '20px', zIndex: 100 }}>
+      {/* 상단 고정 헤더 영역 (버튼 및 기본 정보) */}
+      <div style={{ 
+        position: 'sticky', 
+        top: 0, 
+        right: 0, 
+        left: 0, 
+        padding: '15px 20px', 
+        backgroundColor: 'rgba(255, 255, 255, 0.95)', 
+        backdropFilter: 'blur(10px)',
+        zIndex: 1000,
+        display: 'flex',
+        justifyContent: 'flex-end',
+        borderBottom: '1px solid #eee'
+      }}>
         <button
           onClick={() => setIsLargeText(!isLargeText)}
           style={{
@@ -721,7 +879,7 @@ function App() {
             gap: '8px'
           }}
         >
-          {isLargeText ? '🔍 일반 모드' : '🔎 큰글씨 모드'}
+          {isLargeText ? '🔍 일반' : '🔎 큰글씨'}
         </button>
       </div>
 
@@ -768,7 +926,7 @@ function App() {
               </div>
             ) : (
               <div style={{ width: '100%', textAlign: 'right', marginBottom: '10px' }}>
-                <button 
+                <button
                   onClick={() => setStage('member-login')}
                   style={{ background: '#1976D2', color: 'white', border: 'none', padding: '10px 20px', borderRadius: '8px', fontSize: '18px', fontWeight: 'bold', cursor: 'pointer', boxShadow: '0 2px 4px rgba(0,0,0,0.1)' }}
                 >
@@ -866,6 +1024,140 @@ function App() {
               <button className="btn" onClick={handleDownloadCSV} disabled={isDownloading}>
                 {isDownloading ? '데이터 생성 중...' : '결과 다운로드 (CSV) 📥'}
               </button>
+              <button className="btn" onClick={fetchAdminStats} disabled={isAdminStatLoading} style={{ marginTop: '15px', backgroundColor: '#673AB7' }}>
+                {isAdminStatLoading ? '분석 중...' : '정밀 분석 리포트 보기 📊'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Admin Analysis Stage */}
+      {stage === 'admin-analysis' && (
+        <div className="fade-in" style={{ display: 'flex', flexDirection: 'column', height: '100%', paddingBottom: '40px' }}>
+          <div style={{ width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+            <button className="back-btn" onClick={() => setStage('admin')}>← 뒤로 가기</button>
+            <h2 style={{ margin: 0, color: 'var(--primary-dark)', fontSize: '32px' }}>📊 데이터 분석 대시보드</h2>
+          </div>
+
+          <div className="analysis-grid">
+            {/* 요약 카드 */}
+            <div className="analysis-card">
+              <h3 style={{ margin: '0 0 12px 0', fontSize: '20px', color: 'var(--text-muted)' }}>{loggedInMember ? '나의 총 검사' : '누적 검사 횟수'}</h3>
+              <p style={{ fontSize: '42px', fontWeight: '900', margin: 0, color: 'var(--primary)' }}>
+                {adminStats?.length || 0} <span style={{ fontSize: '20px', fontWeight: '700' }}>회</span>
+              </p>
+            </div>
+            {comparisonStats && (
+              <React.Fragment>
+                <div className="analysis-card" style={{ borderColor: parseFloat(comparisonStats.errors.diff) <= 0 ? 'var(--success)' : 'var(--danger)' }}>
+                  <h3 style={{ margin: '0 0 12px 0', fontSize: '20px', color: 'var(--text-muted)' }}>전주 대비 오타</h3>
+                  <p style={{ fontSize: '30px', fontWeight: '900', margin: '5px 0', color: parseFloat(comparisonStats.errors.diff) <= 0 ? 'var(--success)' : 'var(--danger)' }}>
+                    {comparisonStats.errors.diff > 0 ? `+${comparisonStats.errors.diff}` : comparisonStats.errors.diff} <span style={{ fontSize: '18px' }}>개</span>
+                  </p>
+                  <span style={{ fontSize: '14px', color: '#888' }}>지난주 평균: {comparisonStats.errors.last}개</span>
+                </div>
+                <div className="analysis-card" style={{ borderColor: parseFloat(comparisonStats.time.diff) <= 0 ? 'var(--success)' : 'var(--danger)' }}>
+                  <h3 style={{ margin: '0 0 12px 0', fontSize: '20px', color: 'var(--text-muted)' }}>전주 대비 시간</h3>
+                  <p style={{ fontSize: '30px', fontWeight: '900', margin: '5px 0', color: parseFloat(comparisonStats.time.diff) <= 0 ? 'var(--success)' : 'var(--danger)' }}>
+                    {comparisonStats.time.diff > 0 ? `+${comparisonStats.time.diff}` : comparisonStats.time.diff} <span style={{ fontSize: '18px' }}>초</span>
+                  </p>
+                  <span style={{ fontSize: '14px', color: '#888' }}>지난주 평균: {comparisonStats.time.last}초</span>
+                </div>
+              </React.Fragment>
+            )}
+          </div>
+
+          <div style={{ marginTop: '20px', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))', gap: '24px' }}>
+            {/* 날짜별 점수 추이 차트 */}
+            <div className="analysis-card" style={{ padding: '30px 20px', minHeight: '420px', textAlign: 'center', gridColumn: '1 / -1' }}>
+              <h3 style={{ marginBottom: '24px', fontWeight: '800' }}>📈 {loggedInMember ? '나의 ' : ''}날짜별 평균 점수 추이</h3>
+              <div style={{ width: '100%', height: '300px' }}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart data={trendData}>
+                    <defs>
+                      <linearGradient id="colorScore" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="var(--primary)" stopOpacity={0.3}/>
+                        <stop offset="95%" stopColor="var(--primary)" stopOpacity={0}/>
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#EEEEEE" />
+                    <XAxis dataKey="date" fontSize={12} tick={{ fontWeight: '600' }} />
+                    <YAxis domain={[0, 100]} fontSize={12} />
+                    <RechartsTooltip />
+                    <Area type="monotone" dataKey="score" stroke="var(--primary)" strokeWidth={3} fillOpacity={1} fill="url(#colorScore)" />
+                  </AreaChart>
+                </ResponsiveContainer>
+              </div>
+              <p style={{ marginTop: '10px', fontSize: '16px', color: '#666' }}>※ 매일 기록을 남기면 그래프의 변화를 더 정확하게 볼 수 있습니다.</p>
+            </div>
+
+            {/* 평균 점수 차트 */}
+            <div className="analysis-card" style={{ padding: '30px 20px', minHeight: '420px', textAlign: 'center' }}>
+              <h3 style={{ marginBottom: '24px', fontWeight: '800' }}>💡 종목별 평균 성취도</h3>
+              <div style={{ width: '100%', height: '300px' }}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={chartData}>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#EEEEEE" />
+                    <XAxis dataKey="name" fontSize={14} tick={{ fontWeight: '800' }} axisLine={false} tickLine={false} />
+                    <YAxis domain={[0, 100]} axisLine={false} tickLine={false} hide />
+                    <RechartsTooltip cursor={{ fill: '#F5F5F5' }} />
+                    <Bar dataKey="average" fill="var(--primary)" radius={[8, 8, 0, 0]} label={{ position: 'top', fontSize: 16, fontWeight: 'bold', fill: 'var(--primary)' }} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+
+            {/* 참여 비율 차트 */}
+            <div className="analysis-card" style={{ padding: '30px 20px', minHeight: '420px', textAlign: 'center' }}>
+              <h3 style={{ marginBottom: '10px', fontWeight: '800' }}>📈 검사 참여 분포</h3>
+              <div style={{ width: '100%', height: '300px' }}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={testDistributionData}
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={70}
+                      outerRadius={100}
+                      paddingAngle={8}
+                      dataKey="value"
+                    >
+                      {testDistributionData.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.color} strokeWidth={0} />
+                      ))}
+                    </Pie>
+                    <RechartsTooltip />
+                    <Legend verticalAlign="bottom" height={36} iconType="circle" wrapperStyle={{ fontWeight: 'bold' }} />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+          </div>
+          
+          <div style={{ marginTop: '30px' }}>
+            <h3 style={{ marginBottom: '15px', display: 'flex', alignItems: 'center', gap: '8px' }}>📜 최근 검사 이력 <span style={{ fontSize: '16px', fontWeight: 'normal', color: '#888' }}>(최근 10개 내역)</span></h3>
+            <div className="analysis-table-container">
+              <table className="admin-table">
+                <thead>
+                  <tr>
+                    <th>검사 항목</th>
+                    <th>획득 점수</th>
+                    <th>진행 시간</th>
+                    <th>태어난 연도</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {adminStats?.slice(-10).reverse().map((item, idx) => (
+                    <tr key={idx}>
+                      <td>{item.test_type === 'typing' ? '⌨️ 글씨 직접 치기' : item.test_type === 'voice' ? '🎙️ 목소리로 읽기' : item.test_type === 'card' ? '🃏 그림 짝맞추기' : '🔢 순서 기억 게임'}</td>
+                      <td><span style={{ color: 'var(--primary)', fontWeight: '800' }}>{item.score}</span>점</td>
+                      <td>{item.time_taken}초</td>
+                      <td>{item.birth_year ? `${item.birth_year}년생` : '미입력'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           </div>
         </div>
