@@ -346,12 +346,12 @@ function App() {
     setIsAdminStatLoading(true);
     try {
       let query = supabase.from('test_results').select('*');
-      
+
       // 회원 로그인 상태면 내 데이터만 가저오기
       if (loggedInMember) {
         query = supabase.from('member_test_results').select('*').eq('member_id', loggedInMember);
       }
-      
+
       const { data, error } = await query;
       if (error) throw error;
       setAdminStats(data || []);
@@ -367,7 +367,7 @@ function App() {
   // 날짜별 추이 데이터 가공
   const trendData = useMemo(() => {
     if (!adminStats || adminStats.length === 0) return [];
-    
+
     // 날짜별로 그룹화하여 평균 점수 계산
     const groups = {};
     adminStats.forEach(item => {
@@ -431,7 +431,7 @@ function App() {
   // 분석 데이터 가공
   const chartData = useMemo(() => {
     if (!adminStats || adminStats.length === 0) return [];
-    
+
     const types = {
       typing: { name: '글씨 치기', totalScore: 0, count: 0 },
       voice: { name: '목소리 읽기', totalScore: 0, count: 0 },
@@ -455,7 +455,7 @@ function App() {
 
   const testDistributionData = useMemo(() => {
     if (!adminStats || adminStats.length === 0) return [];
-    
+
     const counts = {
       typing: 0,
       voice: 0,
@@ -860,13 +860,13 @@ function App() {
   return (
     <div className={`app-container fade-in ${isLargeText ? 'large-text-mode' : ''}`}>
       {/* 상단 고정 헤더 영역 (버튼 및 기본 정보) */}
-      <div style={{ 
-        position: 'sticky', 
-        top: 0, 
-        right: 0, 
-        left: 0, 
-        padding: '15px 20px', 
-        backgroundColor: 'rgba(255, 255, 255, 0.95)', 
+      <div style={{
+        position: 'sticky',
+        top: 0,
+        right: 0,
+        left: 0,
+        padding: '15px 20px',
+        backgroundColor: 'rgba(255, 255, 255, 0.95)',
         backdropFilter: 'blur(10px)',
         zIndex: 1000,
         display: 'flex',
@@ -1112,8 +1112,8 @@ function App() {
                   <AreaChart data={trendData}>
                     <defs>
                       <linearGradient id="colorScore" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="var(--primary)" stopOpacity={0.3}/>
-                        <stop offset="95%" stopColor="var(--primary)" stopOpacity={0}/>
+                        <stop offset="5%" stopColor="var(--primary)" stopOpacity={0.3} />
+                        <stop offset="95%" stopColor="var(--primary)" stopOpacity={0} />
                       </linearGradient>
                     </defs>
                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#EEEEEE" />
@@ -1169,7 +1169,7 @@ function App() {
               </div>
             </div>
           </div>
-          
+
           <div style={{ marginTop: '30px' }}>
             <h3 style={{ marginBottom: '15px', display: 'flex', alignItems: 'center', gap: '8px' }}>📜 최근 검사 이력 <span style={{ fontSize: '16px', fontWeight: 'normal', color: '#888' }}>(최근 10개 내역)</span></h3>
             <div className="analysis-table-container">
