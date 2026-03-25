@@ -114,6 +114,7 @@ function App() {
   const [isDownloading, setIsDownloading] = useState(false);
   const [adminStats, setAdminStats] = useState(null);
   const [isAdminStatLoading, setIsAdminStatLoading] = useState(false);
+  const [analysisPeriod, setAnalysisPeriod] = useState('week'); // 'day', 'week', 'month'
 
   // Member States
   const [loggedInMember, setLoggedInMember] = useState(null);
@@ -382,40 +383,50 @@ function App() {
     })).sort((a, b) => new Date(a.date) - new Date(b.date));
   }, [adminStats]);
 
-  // 전주 대비 비교 통계
+  // 기간별 비교 통계 (전일/전주/전월)
   const comparisonStats = useMemo(() => {
     if (!adminStats || adminStats.length === 0) return null;
 
     const now = new Date();
-    const oneWeekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-    const twoWeeksAgo = new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000);
+    let periodMs, baseDate, prevBaseDate;
 
-    const thisWeekItems = adminStats.filter(item => new Date(item.created_at) >= oneWeekAgo);
-    const lastWeekItems = adminStats.filter(item => {
+    if (analysisPeriod === 'day') {
+      periodMs = 24 * 60 * 60 * 1000;
+    } else if (analysisPeriod === 'month') {
+      periodMs = 30 * 24 * 60 * 60 * 1000;
+    } else {
+      periodMs = 7 * 24 * 60 * 60 * 1000; // default week
+    }
+
+    baseDate = new Date(now.getTime() - periodMs);
+    prevBaseDate = new Date(now.getTime() - (periodMs * 2));
+
+    const currentItems = adminStats.filter(item => new Date(item.created_at) >= baseDate);
+    const previousItems = adminStats.filter(item => {
       const d = new Date(item.created_at);
-      return d >= twoWeeksAgo && d < oneWeekAgo;
+      return d >= prevBaseDate && d < baseDate;
     });
 
     const calcAvg = (items, key) => items.length === 0 ? 0 : items.reduce((sum, item) => sum + (item[key] || 0), 0) / items.length;
 
-    const thisWeekErrors = calcAvg(thisWeekItems, 'raw_errors');
-    const lastWeekErrors = calcAvg(lastWeekItems, 'raw_errors');
-    const thisWeekTime = calcAvg(thisWeekItems, 'raw_time');
-    const lastWeekTime = calcAvg(lastWeekItems, 'raw_time');
+    const currentErrors = calcAvg(currentItems, 'raw_errors');
+    const previousErrors = calcAvg(previousItems, 'raw_errors');
+    const currentTime = calcAvg(currentItems, 'raw_time');
+    const previousTime = calcAvg(previousItems, 'raw_time');
 
     return {
       errors: {
-        this: thisWeekErrors.toFixed(1),
-        last: lastWeekErrors.toFixed(1),
-        diff: (thisWeekErrors - lastWeekErrors).toFixed(1)
+        this: currentErrors.toFixed(1),
+        last: previousErrors.toFixed(1),
+        diff: (currentErrors - previousErrors).toFixed(1)
       },
       time: {
-        this: thisWeekTime.toFixed(1),
-        last: lastWeekTime.toFixed(1),
-        diff: (thisWeekTime - lastWeekTime).toFixed(1)
+        this: currentTime.toFixed(1),
+        last: previousTime.toFixed(1),
+        diff: (currentTime - previousTime).toFixed(1)
       }
     };
-  }, [adminStats]);
+  }, [adminStats, analysisPeriod]);
 
   // 분석 데이터 가공
   const chartData = useMemo(() => {
@@ -1037,7 +1048,31 @@ function App() {
         <div className="fade-in" style={{ display: 'flex', flexDirection: 'column', height: '100%', paddingBottom: '40px' }}>
           <div style={{ width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
             <button className="back-btn" onClick={() => setStage('admin')}>← 뒤로 가기</button>
-            <h2 style={{ margin: 0, color: 'var(--primary-dark)', fontSize: '32px' }}>📊 데이터 분석 대시보드</h2>
+            <h2 style={{ margin: 0, color: 'var(--primary-dark)', fontSize: '30px' }}>📊 {loggedInMember ? '나의 ' : ''}데이터 분석</h2>
+          </div>
+
+          {/* 기간 선택 탭 */}
+          <div style={{ display: 'flex', gap: '8px', marginBottom: '24px', background: '#F0F0F0', padding: '6px', borderRadius: '14px', width: 'fit-content' }}>
+            {['day', 'week', 'month'].map((p) => (
+              <button
+                key={p}
+                onClick={() => setAnalysisPeriod(p)}
+                style={{
+                  padding: '10px 24px',
+                  borderRadius: '10px',
+                  border: 'none',
+                  fontSize: '18px',
+                  fontWeight: '800',
+                  cursor: 'pointer',
+                  backgroundColor: analysisPeriod === p ? 'white' : 'transparent',
+                  color: analysisPeriod === p ? 'var(--primary)' : '#666',
+                  boxShadow: analysisPeriod === p ? '0 2px 8px rgba(0,0,0,0.1)' : 'none',
+                  transition: 'all 0.2s'
+                }}
+              >
+                {p === 'day' ? '전일 대비' : p === 'week' ? '전주 대비' : '전월 대비'}
+              </button>
+            ))}
           </div>
 
           <div className="analysis-grid">
@@ -1050,19 +1085,19 @@ function App() {
             </div>
             {comparisonStats && (
               <React.Fragment>
-                <div className="analysis-card" style={{ borderColor: parseFloat(comparisonStats.errors.diff) <= 0 ? 'var(--success)' : 'var(--danger)' }}>
-                  <h3 style={{ margin: '0 0 12px 0', fontSize: '20px', color: 'var(--text-muted)' }}>전주 대비 오타</h3>
-                  <p style={{ fontSize: '30px', fontWeight: '900', margin: '5px 0', color: parseFloat(comparisonStats.errors.diff) <= 0 ? 'var(--success)' : 'var(--danger)' }}>
+                <div className="analysis-card" style={{ borderColor: parseFloat(comparisonStats.errors.diff) <= 0 ? (parseFloat(comparisonStats.errors.diff) === 0 ? 'var(--primary-light)' : 'var(--success)') : 'var(--danger)' }}>
+                  <h3 style={{ margin: '0 0 12px 0', fontSize: '20px', color: 'var(--text-muted)' }}>{analysisPeriod === 'day' ? '전일' : analysisPeriod === 'week' ? '전주' : '전월'} 대비 오타</h3>
+                  <p style={{ fontSize: '30px', fontWeight: '900', margin: '5px 0', color: parseFloat(comparisonStats.errors.diff) <= 0 ? (parseFloat(comparisonStats.errors.diff) === 0 ? 'var(--primary)' : 'var(--success)') : 'var(--danger)' }}>
                     {comparisonStats.errors.diff > 0 ? `+${comparisonStats.errors.diff}` : comparisonStats.errors.diff} <span style={{ fontSize: '18px' }}>개</span>
                   </p>
-                  <span style={{ fontSize: '14px', color: '#888' }}>지난주 평균: {comparisonStats.errors.last}개</span>
+                  <span style={{ fontSize: '14px', color: '#888' }}>이전 평균: {comparisonStats.errors.last}개</span>
                 </div>
-                <div className="analysis-card" style={{ borderColor: parseFloat(comparisonStats.time.diff) <= 0 ? 'var(--success)' : 'var(--danger)' }}>
-                  <h3 style={{ margin: '0 0 12px 0', fontSize: '20px', color: 'var(--text-muted)' }}>전주 대비 시간</h3>
-                  <p style={{ fontSize: '30px', fontWeight: '900', margin: '5px 0', color: parseFloat(comparisonStats.time.diff) <= 0 ? 'var(--success)' : 'var(--danger)' }}>
+                <div className="analysis-card" style={{ borderColor: parseFloat(comparisonStats.time.diff) <= 0 ? (parseFloat(comparisonStats.time.diff) === 0 ? 'var(--primary-light)' : 'var(--success)') : 'var(--danger)' }}>
+                  <h3 style={{ margin: '0 0 12px 0', fontSize: '20px', color: 'var(--text-muted)' }}>{analysisPeriod === 'day' ? '전일' : analysisPeriod === 'week' ? '전주' : '전월'} 대비 시간</h3>
+                  <p style={{ fontSize: '30px', fontWeight: '900', margin: '5px 0', color: parseFloat(comparisonStats.time.diff) <= 0 ? (parseFloat(comparisonStats.time.diff) === 0 ? 'var(--primary)' : 'var(--success)') : 'var(--danger)' }}>
                     {comparisonStats.time.diff > 0 ? `+${comparisonStats.time.diff}` : comparisonStats.time.diff} <span style={{ fontSize: '18px' }}>초</span>
                   </p>
-                  <span style={{ fontSize: '14px', color: '#888' }}>지난주 평균: {comparisonStats.time.last}초</span>
+                  <span style={{ fontSize: '14px', color: '#888' }}>이전 평균: {comparisonStats.time.last}초</span>
                 </div>
               </React.Fragment>
             )}
@@ -1097,12 +1132,12 @@ function App() {
               <h3 style={{ marginBottom: '24px', fontWeight: '800' }}>💡 종목별 평균 성취도</h3>
               <div style={{ width: '100%', height: '300px' }}>
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={chartData}>
+                  <BarChart data={chartData} margin={{ top: 30 }}>
                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#EEEEEE" />
                     <XAxis dataKey="name" fontSize={14} tick={{ fontWeight: '800' }} axisLine={false} tickLine={false} />
-                    <YAxis domain={[0, 100]} axisLine={false} tickLine={false} hide />
+                    <YAxis domain={[0, 110]} axisLine={false} tickLine={false} hide />
                     <RechartsTooltip cursor={{ fill: '#F5F5F5' }} />
-                    <Bar dataKey="average" fill="var(--primary)" radius={[8, 8, 0, 0]} label={{ position: 'top', fontSize: 16, fontWeight: 'bold', fill: 'var(--primary)' }} />
+                    <Bar dataKey="average" fill="var(--primary)" radius={[8, 8, 0, 0]} label={{ position: 'top', fontSize: 18, fontWeight: 'bold', fill: 'var(--primary)', offset: 10 }} />
                   </BarChart>
                 </ResponsiveContainer>
               </div>
