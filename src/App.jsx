@@ -983,10 +983,10 @@ function App() {
             )}
 
             <div style={{ marginBottom: '25px', display: 'flex', alignItems: 'center', gap: '10px', background: '#f5f5f5', padding: '15px', borderRadius: '12px' }}>
-              <input 
-                type="checkbox" 
-                id="agree" 
-                checked={isAgreed} 
+              <input
+                type="checkbox"
+                id="agree"
+                checked={isAgreed}
                 onChange={(e) => setIsAgreed(e.target.checked)}
                 style={{ width: '25px', height: '25px', cursor: 'pointer' }}
               />
@@ -995,15 +995,15 @@ function App() {
               </label>
             </div>
 
-            <button 
-              className="btn" 
+            <button
+              className="btn"
               onClick={() => {
                 if (!isAgreed) {
                   alert("서비스 이용을 위해 데이터 활용에 동의해주세요.");
                   return;
                 }
                 setStage('select-mode');
-              }} 
+              }}
               style={{ padding: '30px 20px', fontSize: '32px', width: '100%' }}
             >
               활동 시작하기 👉
