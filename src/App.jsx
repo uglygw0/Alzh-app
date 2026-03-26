@@ -74,6 +74,7 @@ function App() {
   const [stage, setStage] = useState('home');
   const [testMode, setTestMode] = useState('');
   const [isLargeText, setIsLargeText] = useState(false);
+  const [isAgreed, setIsAgreed] = useState(false);
 
   const [birthYear, setBirthYear] = useState('');
   const [fortune, setFortune] = useState('');
@@ -136,9 +137,7 @@ function App() {
     setTimeout(() => {
       setShowingInitial(false);
       setIsInteractionDisabled(false);
-      if (levelIndex === 0) {
-        setStartTime(Date.now());
-      }
+      setStartTime(Date.now()); // 레벨 시작 시각 설정
     }, 3000);
   };
 
@@ -196,18 +195,23 @@ function App() {
     if (testMode === 'card' && stage === 'card-test' && cards.length > 0 && matchedCards.length === cards.length && !showingInitial) {
       if (cardLevel < 2) {
         setTimeout(() => {
+          const endTime = Date.now();
+          const levelTime = Math.max(0.1, (endTime - startTime) / 1000);
           const nextLevel = cardLevel + 1;
+
+          setResults(prev => [...prev, { level: cardLevel, timeTaken: levelTime, attempts: cardAttempts }]);
           setCardLevel(nextLevel);
+          setCardAttempts(0); // 다음 레벨을 위해 초기화
           setupCardLevel(nextLevel);
+          // startTime은 setupCardLevel 내부의 setTimeout에서 재설정됨 (cardLevel > 0일때는 즉시 시작되거나 보정 필요)
         }, 1500);
       } else {
         setTimeout(() => {
           const endTime = Date.now();
-          const timeTaken = Math.max(1, ((endTime - startTime) / 1000) - 6);
-
-          const newResults = [{ attempts: cardAttempts, timeTaken }];
-          setResults(newResults);
-          finishTest(newResults);
+          const levelTime = Math.max(0.1, (endTime - startTime) / 1000);
+          const finalResults = [...results, { level: cardLevel, timeTaken: levelTime, attempts: cardAttempts }];
+          setResults(finalResults);
+          finishTest(finalResults);
         }, 1500);
       }
     }
@@ -232,7 +236,7 @@ function App() {
       if (error) throw error;
 
       if (!data || data.length === 0) {
-        alert("아직 누적된 내 검사 데이터가 없습니다.");
+        alert("아직 누적된 내 활동 데이터가 없습니다.");
         setIsMemberDownloading(false);
         return;
       }
@@ -518,17 +522,26 @@ function App() {
     setSeqAttempts(prev => prev + 1);
 
     if (target === user) {
-      setSeqInput('');
-      const next = seqLevel + 1;
-      if (next < SEQ_LEVELS.length) {
+      const endTime = Date.now();
+      const levelTime = Math.max(0.1, (endTime - startTime) / 1000);
+      const levelResult = { level: seqLevel, attempts: seqAttempts + 1, errors: seqErrors, timeTaken: levelTime };
+
+      if (seqLevel === SEQ_LEVELS.length - 1) {
+        const finalResults = [...results, levelResult];
+        setResults(finalResults);
+        finishTest(finalResults);
+      } else {
+        setResults(prev => [...prev, levelResult]);
+        setSeqInput('');
+        setSeqAttempts(0);
+        setSeqErrors(0);
+        const next = seqLevel + 1;
         setSeqLevel(next);
         setShowingInitial(true);
-        setTimeout(() => setShowingInitial(false), 3000);
-      } else {
-        const timeTaken = Math.max(1, ((Date.now() - startTime) / 1000) - ((SEQ_LEVELS.length - 1) * 3));
-        const newResults = [{ attempts: seqAttempts + 1, errors: seqErrors, timeTaken }];
-        setResults(newResults);
-        finishTest(newResults);
+        setTimeout(() => {
+          setShowingInitial(false);
+          setStartTime(Date.now());
+        }, 3000);
       }
     } else {
       setSeqErrors(prev => prev + 1);
@@ -537,21 +550,46 @@ function App() {
   };
 
   const handleSeqSkip = () => {
-    setSeqAttempts(prev => prev + 1);
-    setSeqErrors(prev => prev + 2); // 스킵 시 기본 패널티(오답 2회 처리)
+    const endTime = Date.now();
+    const levelTime = Math.max(0.1, (endTime - startTime) / 1000);
+    const levelResult = { level: seqLevel, attempts: seqAttempts, errors: seqErrors + 2, timeTaken: levelTime };
 
-    setSeqInput('');
-    const next = seqLevel + 1;
-    if (next < SEQ_LEVELS.length) {
+    if (seqLevel === SEQ_LEVELS.length - 1) {
+      const finalResults = [...results, levelResult];
+      setResults(finalResults);
+      finishTest(finalResults);
+    } else {
+      setResults(prev => [...prev, levelResult]);
+      setSeqInput('');
+      setSeqAttempts(0);
+      setSeqErrors(0);
+      const next = seqLevel + 1;
       setSeqLevel(next);
       setShowingInitial(true);
-      setTimeout(() => setShowingInitial(false), 3000);
-    } else {
-      const timeTaken = Math.max(1, ((Date.now() - startTime) / 1000) - ((SEQ_LEVELS.length - 1) * 3));
-      const newResults = [{ attempts: seqAttempts + 1, errors: seqErrors + 2, timeTaken }];
-      setResults(newResults);
-      finishTest(newResults);
+      setTimeout(() => {
+        setShowingInitial(false);
+        setStartTime(Date.now());
+      }, 3000);
     }
+  };
+
+  // --- 지표 계산 함수들 ---
+  const getConsistency = (normalizedTimes) => {
+    if (normalizedTimes.length < 2) return 100;
+    const mean = normalizedTimes.reduce((a, b) => a + b, 0) / normalizedTimes.length;
+    const variance = normalizedTimes.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / normalizedTimes.length;
+    const stdDev = Math.sqrt(variance);
+    const cv = stdDev / (mean || 1);
+    const score = Math.max(0, 100 - (cv * 100));
+    return parseFloat(score.toFixed(1));
+  };
+
+  const getLearningEffect = (normalizedTimes) => {
+    if (normalizedTimes.length < 2) return 0;
+    const initial = normalizedTimes[0];
+    const final = normalizedTimes[normalizedTimes.length - 1];
+    const effect = ((initial - final) / (initial || 1)) * 100;
+    return parseFloat(effect.toFixed(1));
   };
 
   // 타이핑 테스트 로직
@@ -662,163 +700,156 @@ function App() {
   const finishTest = async (finalResults) => {
     setStage('analyzing');
 
-    // DB 저장 시작
     try {
       if (testMode === 'typing') {
         let totalErrors = 0;
         let totalLength = 0;
         let totalTime = 0;
+        const normalizedTimes = finalResults.map(r => r.timeTaken / (r.length || 1));
+
         finalResults.forEach(r => {
           totalErrors += r.errorCount;
           totalLength += r.length;
           totalTime += r.timeTaken;
         });
+
         const accuracy = Math.max(0, 100 - (totalErrors / totalLength) * 100);
         const estimatedStrokes = totalLength * 2.5;
         const timeInMinutes = Math.max(0.1, totalTime / 60);
         const cpm = Math.round(estimatedStrokes / timeInMinutes);
 
-        // 어르신 기준으로 120타를 100점 만점으로 계산
         const speedScore = Math.min(100, (cpm / 120) * 100);
-        // 정확도 70%, 타건 속도 30%를 반영하여 0~100점 사이의 세밀한 종합 점수 산출
         let comprehensiveScore = Math.round((accuracy * 0.7) + (speedScore * 0.3));
 
-        // 타자 검사 (기준점: 난이도 1.0)
-        let normalizedTime = totalTime * 1.0;
-        let normalizedScore = Math.min(100, comprehensiveScore);
-        const dbRating = normalizedScore.toString();
+        const normalizedScore = Math.min(100, comprehensiveScore);
+        const consistency = getConsistency(normalizedTimes);
+        const learningEffect = getLearningEffect(normalizedTimes);
 
         const commonData = {
           test_type: 'typing',
           birth_year: parseInt(birthYear, 10) || null,
           score: parseFloat(normalizedScore.toFixed(1)),
-          time_taken: parseFloat(normalizedTime.toFixed(1)),
-          rating: dbRating,
+          time_taken: parseFloat(totalTime.toFixed(1)),
+          rating: normalizedScore.toString(),
           raw_time: parseFloat(totalTime.toFixed(1)),
           raw_errors: totalErrors,
+          consistency: consistency,
+          learning_effect: learningEffect,
           details: { estimatedStrokes, cpm, accuracy: parseFloat(accuracy.toFixed(1)) }
         };
-        const { error: commonError } = await supabase.from('test_results').insert([commonData]);
-        if (commonError) console.error("test_results error:", commonError);
+        await supabase.from('test_results').insert([commonData]);
 
         if (loggedInMember) {
-          const { error: memberError } = await supabase.from('member_test_results').insert([{ ...commonData, member_id: loggedInMember }]);
-          if (memberError) {
-            console.error("member_test_results error:", memberError);
-            alert(`회원 DB 저장 실패: ${memberError.message}\n(대시보드의 RLS 설정 또는 컬럼명이 정확한지 확인해 주세요.)`);
-          }
+          await supabase.from('member_test_results').insert([{ ...commonData, member_id: loggedInMember }]);
         }
       } else if (testMode === 'voice') {
         let totalTime = 0;
         let totalAccuracy = 0;
         let totalPauses = 0;
         let totalRepeats = 0;
+        const normalizedTimes = finalResults.map(r => r.timeTaken / (r.length || 1));
+
         finalResults.forEach(r => {
           totalTime += r.timeTaken;
           totalAccuracy += r.accuracy;
           totalPauses += r.unexpectedPauses;
           totalRepeats += r.wordRepetitions;
         });
-        const avgAccuracy = totalAccuracy / finalResults.length;
 
-        // 정확도를 기본으로 두고, 머뭇거림(1회당 -5점)과 단어 반복(1회당 -5점)을 감점 요인으로 계산
+        const avgAccuracy = totalAccuracy / finalResults.length;
         let comprehensiveScore = Math.round(avgAccuracy - (totalPauses * 5) - (totalRepeats * 5));
 
-        // 음성 검사 (기준점: 난이도 1.0)
-        let normalizedTime = totalTime * 1.0;
-        let normalizedScore = Math.max(0, Math.min(100, comprehensiveScore));
-        const dbRating = normalizedScore.toString();
+        const normalizedScore = Math.max(0, Math.min(100, comprehensiveScore));
+        const consistency = getConsistency(normalizedTimes);
+        const learningEffect = getLearningEffect(normalizedTimes);
 
         const commonData = {
           test_type: 'voice',
           birth_year: parseInt(birthYear, 10) || null,
           score: parseFloat(normalizedScore.toFixed(1)),
-          time_taken: parseFloat(normalizedTime.toFixed(1)),
-          rating: dbRating,
+          time_taken: parseFloat(totalTime.toFixed(1)),
+          rating: normalizedScore.toString(),
           raw_time: parseFloat(totalTime.toFixed(1)),
           raw_errors: totalPauses + totalRepeats,
+          consistency: consistency,
+          learning_effect: learningEffect,
           details: { unexpectedPauses: totalPauses, wordRepetitions: totalRepeats, accuracy: parseFloat(avgAccuracy.toFixed(1)) }
         };
-        const { error: commonError } = await supabase.from('test_results').insert([commonData]);
-        if (commonError) console.error("test_results error:", commonError);
+        await supabase.from('test_results').insert([commonData]);
 
         if (loggedInMember) {
-          const { error: memberError } = await supabase.from('member_test_results').insert([{ ...commonData, member_id: loggedInMember }]);
-          if (memberError) {
-            console.error("member_test_results error:", memberError);
-            alert(`회원 DB 저장 실패: ${memberError.message}\n(대시보드의 RLS 설정 또는 컬럼명이 정확한지 확인해 주세요.)`);
-          }
+          await supabase.from('member_test_results').insert([{ ...commonData, member_id: loggedInMember }]);
         }
       } else if (testMode === 'card') {
-        const result = finalResults[0];
-        const timeTaken = result.timeTaken;
-        const attempts = result.attempts;
-        const errors = Math.max(0, attempts - 18);
+        let totalTime = 0;
+        let totalAttempts = 0;
+        const cardCounts = [8, 12, 16];
+        const normalizedTimes = finalResults.map((r, i) => r.timeTaken / cardCounts[i]);
 
-        let score = 100;
-        score -= errors * 5;
-        if (timeTaken > 60) {
-          score -= (timeTaken - 60) * 0.5;
-        }
+        finalResults.forEach(r => {
+          totalTime += r.timeTaken;
+          totalAttempts += r.attempts;
+        });
 
-        // 카드 뒤집기 검사 (매우 어려운 난이도: 시간 보정 x0.35, 점수 추가 보정)
-        let normalizedTime = timeTaken * 0.35;
-        let normalizedScore = Math.max(0, Math.min(100, Math.round(score + 10))); // 난이도를 감안하여 점수 +10 보정
-        const dbRating = normalizedScore.toString();
+        const totalErrors = Math.max(0, totalAttempts - 18);
+        let score = 100 - (totalErrors * 5);
+        if (totalTime > 60) score -= (totalTime - 60) * 0.5;
+
+        const normalizedScore = Math.max(0, Math.min(100, Math.round(score + 10)));
+        const consistency = getConsistency(normalizedTimes);
+        const learningEffect = getLearningEffect(normalizedTimes);
 
         const commonData = {
           test_type: 'card',
           birth_year: parseInt(birthYear, 10) || null,
           score: parseFloat(normalizedScore.toFixed(1)),
-          time_taken: parseFloat(normalizedTime.toFixed(1)),
-          rating: dbRating,
-          raw_time: parseFloat(timeTaken.toFixed(1)),
-          raw_errors: errors,
-          details: { attempts }
+          time_taken: parseFloat((totalTime * 0.35).toFixed(1)),
+          rating: normalizedScore.toString(),
+          raw_time: parseFloat(totalTime.toFixed(1)),
+          raw_errors: totalErrors,
+          consistency: consistency,
+          learning_effect: learningEffect,
+          details: { attempts: totalAttempts }
         };
-        const { error: commonError } = await supabase.from('test_results').insert([commonData]);
-        if (commonError) console.error("test_results error:", commonError);
+        await supabase.from('test_results').insert([commonData]);
 
         if (loggedInMember) {
-          const { error: memberError } = await supabase.from('member_test_results').insert([{ ...commonData, member_id: loggedInMember }]);
-          if (memberError) {
-            console.error("member_test_results error:", memberError);
-            alert(`회원 DB 저장 실패: ${memberError.message}\n(대시보드의 RLS 설정 또는 컬럼명이 정확한지 확인해 주세요.)`);
-          }
+          await supabase.from('member_test_results').insert([{ ...commonData, member_id: loggedInMember }]);
         }
       } else if (testMode === 'sequence') {
-        const result = finalResults[0];
-        const errors = result.errors;
-        const timeTaken = Math.max(0, result.timeTaken);
+        let totalTime = 0;
+        let totalErrors = 0;
+        const itemCounts = SEQ_LEVELS.map(s => s.replace(/\s/g, '').length);
+        const normalizedTimes = finalResults.map((r, i) => r.timeTaken / itemCounts[i]);
 
-        let score = 100;
-        score -= errors * 10;
-        if (timeTaken > 30) score -= (timeTaken - 30) * 1;
+        finalResults.forEach(r => {
+          totalTime += r.timeTaken;
+          totalErrors += r.errors;
+        });
 
-        // 순서 기억 검사 (어려운 난이도: 시간 보정 x0.5, 점수 추가 보정)
-        let normalizedTime = timeTaken * 0.5;
-        let normalizedScore = Math.max(0, Math.min(100, Math.round(score + 5))); // 난이도를 감안하여 점수 +5 보정
-        const dbRating = normalizedScore.toString();
+        let score = 100 - (totalErrors * 10);
+        if (totalTime > 30) score -= (totalTime - 30) * 1;
+
+        const normalizedScore = Math.max(0, Math.min(100, Math.round(score + 5)));
+        const consistency = getConsistency(normalizedTimes);
+        const learningEffect = getLearningEffect(normalizedTimes);
 
         const commonData = {
           test_type: 'sequence',
           birth_year: parseInt(birthYear, 10) || null,
           score: parseFloat(normalizedScore.toFixed(1)),
-          time_taken: parseFloat(normalizedTime.toFixed(1)),
-          rating: dbRating,
-          raw_time: parseFloat(timeTaken.toFixed(1)),
-          raw_errors: errors,
-          details: { attempts: result.attempts }
+          time_taken: parseFloat((totalTime * 0.5).toFixed(1)),
+          rating: normalizedScore.toString(),
+          raw_time: parseFloat(totalTime.toFixed(1)),
+          raw_errors: totalErrors,
+          consistency: consistency,
+          learning_effect: learningEffect,
+          details: { attempts: finalResults.reduce((sum, r) => sum + r.attempts, 0) }
         };
-        const { error: commonError } = await supabase.from('test_results').insert([commonData]);
-        if (commonError) console.error("test_results error:", commonError);
+        await supabase.from('test_results').insert([commonData]);
 
         if (loggedInMember) {
-          const { error: memberError } = await supabase.from('member_test_results').insert([{ ...commonData, member_id: loggedInMember }]);
-          if (memberError) {
-            console.error("member_test_results error:", memberError);
-            alert(`회원 DB 저장 실패: ${memberError.message}\n(대시보드의 RLS 설정 또는 컬럼명이 정확한지 확인해 주세요.)`);
-          }
+          await supabase.from('member_test_results').insert([{ ...commonData, member_id: loggedInMember }]);
         }
       }
     } catch (error) {
@@ -834,12 +865,17 @@ function App() {
   const renderResult = () => {
     return (
       <React.Fragment>
-        <div className="solid-card" style={{ textAlign: 'center', backgroundColor: 'var(--primary-light)', borderColor: 'var(--primary)' }}>
-          <h2 style={{ color: 'var(--primary)', fontSize: '40px', fontWeight: '800' }}>고생하셨습니다!!</h2>
-          <p style={{ color: 'var(--text-dark)', marginTop: '20px', fontSize: '18px' }}>
-            검사를 무사히 마치셨습니다. 꾸준한 두뇌 활동으로 늘 건강을 유지하세요!<br />
-            (검사 결과는 안전하게 서버에 저장되었습니다.)
+        <div className="solid-card" style={{ textAlign: 'center', backgroundColor: 'var(--primary-light)', borderColor: 'var(--primary)', borderWidth: '4px' }}>
+          <h2 style={{ color: 'var(--primary)', fontSize: '40px', fontWeight: '800' }}>고생하셨습니다!! ✨</h2>
+          <p style={{ color: 'var(--text-dark)', marginTop: '20px', fontSize: '22px', fontWeight: '700' }}>
+            오늘의 두뇌 활성 활동을 무사히 마치셨습니다.<br />
+            꾸준한 활동은 건강한 일상을 지키는 가장 큰 힘이 됩니다.<br />
+            앞으로도 즐겁게 참여해 보세요!
           </p>
+          <div style={{ marginTop: '25px', fontSize: '16px', color: '#888', fontWeight: '600' }}>
+            * 분석된 활동 패턴 리포트는 안전하게 기록되어<br />
+            삼성화재 건강 케어 서비스의 기초 자료로 활용됩니다.
+          </div>
         </div>
       </React.Fragment>
     );
@@ -897,8 +933,8 @@ function App() {
       {stage === 'home' && (
         <div className="center-content fade-in">
           <div className="header-icon" style={{ fontSize: '60px', width: '100px', height: '100px', background: '#FFF8E1', color: '#FFC107', borderColor: '#FFC107' }}>🍀</div>
-          <h1 style={{ fontSize: '38px', marginBottom: '10px' }}>기억력 튼튼 검사</h1>
-          <p style={{ fontSize: '22px', marginBottom: '30px' }}>검사하시기 전, 재미로 오늘의 운세를 확인해 보세요!</p>
+          <h1 style={{ fontSize: '38px', marginBottom: '10px' }}>두뇌 활성 케어 매니저</h1>
+          <p style={{ fontSize: '22px', marginBottom: '30px' }}>오늘의 활동을 시작하기 전, 재미로 운세를 확인해 보세요!</p>
 
           <div className="solid-card" style={{ width: '100%', marginBottom: '30px', padding: '30px 20px' }}>
             <h2 style={{ fontSize: '26px', marginBottom: '20px' }}>어르신의 태어난 연도를 고르세요</h2>
@@ -946,15 +982,38 @@ function App() {
               </div>
             )}
 
-            <button className="btn" onClick={() => setStage('select-mode')} style={{ padding: '30px 20px', fontSize: '32px', width: '100%' }}>
-              검사 체험하기 👉
+            <div style={{ marginBottom: '25px', display: 'flex', alignItems: 'center', gap: '10px', background: '#f5f5f5', padding: '15px', borderRadius: '12px' }}>
+              <input 
+                type="checkbox" 
+                id="agree" 
+                checked={isAgreed} 
+                onChange={(e) => setIsAgreed(e.target.checked)}
+                style={{ width: '25px', height: '25px', cursor: 'pointer' }}
+              />
+              <label htmlFor="agree" style={{ fontSize: '18px', cursor: 'pointer', fontWeight: '600' }}>
+                [필수] 데이터 활용 및 삼성화재 API 연동 동의
+              </label>
+            </div>
+
+            <button 
+              className="btn" 
+              onClick={() => {
+                if (!isAgreed) {
+                  alert("서비스 이용을 위해 데이터 활용에 동의해주세요.");
+                  return;
+                }
+                setStage('select-mode');
+              }} 
+              style={{ padding: '30px 20px', fontSize: '32px', width: '100%' }}
+            >
+              활동 시작하기 👉
             </button>
 
             <button
               onClick={handleAdminClick}
               style={{ marginTop: '25px', background: 'transparent', border: 'none', color: '#aaaaaa', fontSize: '14px', cursor: 'pointer', outline: 'none', padding: '10px' }}
             >
-              관리자 모드
+              시스템 관리자
             </button>
           </div>
         </div>
@@ -1002,14 +1061,14 @@ function App() {
           </div>
           <div className="center-content" style={{ flex: 1, justifyContent: 'center' }}>
             <div className="solid-card" style={{ maxWidth: '400px', width: '100%', margin: '0 auto', textAlign: 'center' }}>
-              <h2>관리자 메뉴</h2>
-              <p style={{ color: 'var(--text-light)', marginBottom: '30px', fontSize: '18px' }}>접근 권한을 위해 비밀번호를 입력해주세요.</p>
+              <h2>시스템 관리 메인</h2>
+              <p style={{ color: 'var(--text-light)', marginBottom: '30px', fontSize: '18px' }}>데이터 접근을 위해 관리자 인증 키를 입력해주세요.</p>
               <input
                 type="password"
                 className="typing-input"
                 value={adminPassword}
                 onChange={(e) => setAdminPassword(e.target.value)}
-                placeholder="비밀번호"
+                placeholder="인증 키 입력"
                 style={{ textAlign: 'center', marginBottom: '20px', letterSpacing: '4px' }}
                 onKeyDown={(e) => { if (e.key === 'Enter') handleAdminSubmit(); }}
               />
@@ -1028,9 +1087,9 @@ function App() {
           <div className="center-content" style={{ flex: 1, justifyContent: 'center' }}>
             <div className="solid-card" style={{ maxWidth: '450px', width: '100%', margin: '0 auto', textAlign: 'center' }}>
               <div className="header-icon" style={{ fontSize: '50px', width: '80px', height: '80px', background: '#E3F2FD', color: '#1976D2', borderColor: '#1976D2' }}>📊</div>
-              <h2>데이터 관리실</h2>
+              <h2>활동 데이터 분석</h2>
               <p style={{ color: 'var(--text-dark)', marginBottom: '40px', fontSize: '20px' }}>
-                현재까지 Supabase DB에 누적된 어르신들의 <strong>모든 검사 데이터</strong>를 엑셀(CSV) 파일 형식으로 즉시 다운로드하실 수 있습니다.
+                현재까지 누적된 어르신들의 <strong>두뇌 활동 데이터</strong>를 엑셀(CSV) 파일 형식으로 즉시 다운로드하실 수 있습니다.
               </p>
               <button className="btn" onClick={handleDownloadCSV} disabled={isDownloading}>
                 {isDownloading ? '데이터 생성 중...' : '결과 다운로드 (CSV) 📥'}
@@ -1078,7 +1137,7 @@ function App() {
           <div className="analysis-grid">
             {/* 요약 카드 */}
             <div className="analysis-card">
-              <h3 style={{ margin: '0 0 12px 0', fontSize: '20px', color: 'var(--text-muted)' }}>{loggedInMember ? '나의 총 검사' : '누적 검사 횟수'}</h3>
+              <h3 style={{ margin: '0 0 12px 0', fontSize: '20px', color: 'var(--text-muted)' }}>{loggedInMember ? '나의 기록' : '누적 기록'}</h3>
               <p style={{ fontSize: '42px', fontWeight: '900', margin: 0, color: 'var(--primary)' }}>
                 {adminStats?.length || 0} <span style={{ fontSize: '20px', fontWeight: '700' }}>회</span>
               </p>
@@ -1086,7 +1145,7 @@ function App() {
             {comparisonStats && (
               <React.Fragment>
                 <div className="analysis-card" style={{ borderColor: parseFloat(comparisonStats.errors.diff) <= 0 ? (parseFloat(comparisonStats.errors.diff) === 0 ? 'var(--primary-light)' : 'var(--success)') : 'var(--danger)' }}>
-                  <h3 style={{ margin: '0 0 12px 0', fontSize: '20px', color: 'var(--text-muted)' }}>{analysisPeriod === 'day' ? '전일' : analysisPeriod === 'week' ? '전주' : '전월'} 대비 오타</h3>
+                  <h3 style={{ margin: '0 0 12px 0', fontSize: '20px', color: 'var(--text-muted)' }}>{analysisPeriod === 'day' ? '전일' : analysisPeriod === 'week' ? '전주' : '전월'} 대비 입력 보정</h3>
                   <p style={{ fontSize: '30px', fontWeight: '900', margin: '5px 0', color: parseFloat(comparisonStats.errors.diff) <= 0 ? (parseFloat(comparisonStats.errors.diff) === 0 ? 'var(--primary)' : 'var(--success)') : 'var(--danger)' }}>
                     {comparisonStats.errors.diff > 0 ? `+${comparisonStats.errors.diff}` : comparisonStats.errors.diff} <span style={{ fontSize: '18px' }}>개</span>
                   </p>
@@ -1145,7 +1204,7 @@ function App() {
 
             {/* 참여 비율 차트 */}
             <div className="analysis-card" style={{ padding: '30px 20px', minHeight: '420px', textAlign: 'center' }}>
-              <h3 style={{ marginBottom: '10px', fontWeight: '800' }}>📈 검사 참여 분포</h3>
+              <h3 style={{ marginBottom: '10px', fontWeight: '800' }}>📈 활동 참여 분포</h3>
               <div style={{ width: '100%', height: '300px' }}>
                 <ResponsiveContainer width="100%" height="100%">
                   <PieChart>
@@ -1171,15 +1230,15 @@ function App() {
           </div>
 
           <div style={{ marginTop: '30px' }}>
-            <h3 style={{ marginBottom: '15px', display: 'flex', alignItems: 'center', gap: '8px' }}>📜 최근 검사 이력 <span style={{ fontSize: '16px', fontWeight: 'normal', color: '#888' }}>(최근 10개 내역)</span></h3>
+            <h3 style={{ marginBottom: '15px', display: 'flex', alignItems: 'center', gap: '8px' }}>📜 최근 활동 기록 <span style={{ fontSize: '16px', fontWeight: 'normal', color: '#888' }}>(최근 10개 내역)</span></h3>
             <div className="analysis-table-container">
               <table className="admin-table">
                 <thead>
                   <tr>
-                    <th>검사 항목</th>
-                    <th>획득 점수</th>
-                    <th>진행 시간</th>
-                    <th>태어난 연도</th>
+                    <th>활동 항목</th>
+                    <th>활력 점수</th>
+                    <th>소요 시간</th>
+                    <th>출생 연도</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1205,9 +1264,9 @@ function App() {
           </div>
           <div className="center-content" style={{ flex: 1, justifyContent: 'flex-start', paddingTop: '10px' }}>
             <div className="header-icon">🧠</div>
-            <h1>기억력 튼튼 테스트</h1>
+            <h1>두뇌 활성 체크 활동</h1>
             <p style={{ marginBottom: '40px', fontSize: '24px' }}>
-              원하시는 검사 방식을 화면에서 <strong>크게</strong> 눌러주세요.
+              오늘 진행하실 <strong>두뇌 활동</strong>을 눌러주세요.
             </p>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '24px', width: '100%' }}>
@@ -1509,7 +1568,7 @@ function App() {
       {stage === 'analyzing' && (
         <div className="center-content fade-in">
           <div className="loader"></div>
-          <h2 style={{ fontSize: '36px', marginBottom: '30px' }}>확인 중입니다...</h2>
+          <h2 style={{ fontSize: '36px', marginBottom: '30px' }}>두뇌 패턴 분석 중...</h2>
           <div className="solid-card">
             <p style={{ fontSize: '26px', fontWeight: 'bold', color: 'var(--primary-dark)', margin: 0 }}>
               {testMode === 'typing'
@@ -1526,7 +1585,7 @@ function App() {
       {stage === 'result' && (
         <div className="fade-in" style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
           <div className="header-icon" style={{ margin: '0 auto 24px auto', background: 'var(--primary)', color: 'white' }}>✨</div>
-          <h1 style={{ textAlign: 'center', marginBottom: '8px', fontSize: '40px' }}>종합 확인 결과</h1>
+          <h1 style={{ textAlign: 'center', marginBottom: '8px', fontSize: '40px' }}>오늘의 두뇌 활력 리포트</h1>
 
           <div style={{ marginTop: '24px', display: 'flex', flexDirection: 'column', flex: 1 }}>
             {renderResult()}
