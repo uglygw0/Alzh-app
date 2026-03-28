@@ -1101,6 +1101,7 @@ function App() {
 
       {/* Admin Dashboard */}
       {stage === 'admin' && (
+        <div className="fade-in" style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
           <div style={{ width: '100%', display: 'flex', alignItems: 'center', marginBottom: '20px' }}>
             <button 
               className="back-btn" 
@@ -1198,6 +1199,8 @@ function App() {
               </div>
             </div>
           </div>
+        </div>
+      )}
         </div>
       )}
 
