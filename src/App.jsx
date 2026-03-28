@@ -1101,38 +1101,64 @@ function App() {
 
       {/* Admin Dashboard */}
       {stage === 'admin' && (
-        <div className="fade-in" style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-          <div style={{ width: '100%' }}>
-            <button className="back-btn" onClick={() => setStage('home')}>← 처음으로</button>
+          <div style={{ width: '100%', display: 'flex', alignItems: 'center', marginBottom: '20px' }}>
+            <button 
+              className="back-btn" 
+              onClick={() => setStage('home')}
+              style={{ padding: '12px 20px', backgroundColor: 'var(--primary)', color: 'white', borderColor: 'var(--primary-dark)', boxShadow: '0 4px 8px rgba(0,0,0,0.1)' }}
+            >
+              🏠 처음 화면으로
+            </button>
+            <h1 style={{ margin: '0 0 0 20px', fontSize: '28px', flex: 1 }}>시스템 관리자 모드</h1>
           </div>
-          <div className="center-content" style={{ flex: 1, justifyContent: 'center' }}>
-            <div className="solid-card" style={{ maxWidth: '500px', width: '100%', margin: '0 auto', textAlign: 'center' }}>
-              <div className="header-icon" style={{ fontSize: '50px', width: '80px', height: '80px', background: '#E3F2FD', color: '#1976D2', borderColor: '#1976D2' }}>📊</div>
-              <h2>데이터 관리 및 분석</h2>
-              <p style={{ color: 'var(--text-dark)', marginBottom: '30px', fontSize: '18px' }}>
-                축적된 활동 데이터를 다운로드하거나<br />정밀적인 패턴 분석 리포트를 확인합니다.
+
+          <div className="center-content" style={{ flex: 1, justifyContent: 'flex-start', paddingTop: '20px' }}>
+            <div className="solid-card" style={{ maxWidth: '550px', width: '100%', margin: '0 auto', textAlign: 'center', backgroundColor: 'white', border: '5px solid var(--primary)' }}>
+              <div className="header-icon" style={{ fontSize: '50px', width: '80px', height: '80px', background: '#E3F2FD', color: '#1976D2', borderColor: '#1976D2', margin: '0 auto 20px auto' }}>🛡️</div>
+              <h2 style={{ fontSize: '32px', color: 'var(--primary-dark)' }}>데이터 분석 및 다운로드</h2>
+              <p style={{ color: 'var(--text-muted)', marginBottom: '35px', fontSize: '18px' }}>
+                안전하게 관리되는 활동 데이터를 확인하고<br />필요한 리포트를 추출할 수 있습니다.
               </p>
 
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '25px' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
                 {/* 전체 다운로드 섹션 */}
-                <div style={{ backgroundColor: '#f8f9fa', padding: '15px', borderRadius: '12px', border: '1px solid #eee' }}>
-                  <p style={{ margin: '0 0 10px 0', fontWeight: 'bold', fontSize: '16px', color: '#666' }}>전체 사용자 데이터</p>
-                  <button className="btn" onClick={handleDownloadCSV} disabled={isDownloading} style={{ margin: 0, width: '100%' }}>
-                    {isDownloading ? '다운로드 중...' : '전체 결과 다운로드 (CSV) 📥'}
+                <div style={{ backgroundColor: '#f8f9fa', padding: '20px', borderRadius: '16px', border: '2px solid #dee2e6' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
+                    <span style={{ fontWeight: '800', fontSize: '18px', color: '#444' }}>📊 전체 데이터 관리</span>
+                    <span style={{ backgroundColor: '#e9ecef', padding: '4px 12px', borderRadius: '20px', fontSize: '14px', fontWeight: 'bold' }}>All Users</span>
+                  </div>
+                  <button className="btn" onClick={handleDownloadCSV} disabled={isDownloading} style={{ margin: 0, width: '100%', padding: '15px', fontSize: '20px' }}>
+                    {isDownloading ? '준비 중...' : '전체 결과 통합 다운로드 (CSV) 📥'}
                   </button>
                 </div>
 
                 {/* 회원 선택 다운로드 섹션 */}
-                <div style={{ backgroundColor: '#f1f8e9', padding: '15px', borderRadius: '12px', border: '1px solid #c8e6c9' }}>
-                  <p style={{ margin: '0 0 10px 0', fontWeight: 'bold', fontSize: '16px', color: '#2E7D32' }}>회원별 선택 다운로드</p>
-                  <div style={{ display: 'flex', gap: '10px', marginBottom: '10px' }}>
+                <div style={{ backgroundColor: '#E8F5E9', padding: '20px', borderRadius: '16px', border: '3px solid #4CAF50' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
+                    <span style={{ fontWeight: '800', fontSize: '18px', color: '#2E7D32' }}>👤 회원별 개별 관리</span>
+                    {selectedMember && (
+                      <span style={{ backgroundColor: '#4CAF50', color: 'white', padding: '4px 12px', borderRadius: '20px', fontSize: '14px', fontWeight: '900', animation: 'pulse-success 2s infinite' }}>
+                        선택됨: {selectedMember}
+                      </span>
+                    )}
+                  </div>
+                  
+                  <div style={{ display: 'flex', gap: '12px', marginBottom: '10px' }}>
                     <select 
                       className="large-select" 
-                      style={{ margin: 0, flex: 1, height: '54px', fontSize: '18px' }}
+                      style={{ 
+                        margin: 0, 
+                        flex: 1, 
+                        height: '64px', 
+                        fontSize: '22px', 
+                        padding: '0 15px', 
+                        backgroundColor: 'white',
+                        border: selectedMember ? '4px solid #4CAF50' : '4px solid #ccc'
+                      }}
                       value={selectedMember}
                       onChange={(e) => setSelectedMember(e.target.value)}
                     >
-                      <option value="">-- 회원 선택 --</option>
+                      <option value="">-- 회원 아이디 선택 --</option>
                       {memberList.map(mid => (
                         <option key={mid} value={mid}>{mid}</option>
                       ))}
@@ -1141,16 +1167,33 @@ function App() {
                       className="btn" 
                       onClick={handleDownloadSelectedMemberResults} 
                       disabled={isDownloading || !selectedMember} 
-                      style={{ margin: 0, backgroundColor: '#4CAF50', padding: '0 20px', whiteSpace: 'nowrap' }}
+                      style={{ 
+                        margin: 0, 
+                        backgroundColor: selectedMember ? '#2E7D32' : '#ccc', 
+                        padding: '0 25px', 
+                        fontSize: '20px', 
+                        whiteSpace: 'nowrap',
+                        boxShadow: selectedMember ? '0 4px 10px rgba(46, 125, 50, 0.3)' : 'none'
+                      }}
                     >
-                      ⬇️ 받기
+                      다운로드 📥
                     </button>
                   </div>
+                  {selectedMember === 'uglygw0' && (
+                    <p style={{ margin: '8px 0 0 0', fontSize: '14px', color: '#1B5E20', fontWeight: '800' }}>
+                      ✨ 등록된 uglygw0 회원의 데이터를 추출할 수 있습니다.
+                    </p>
+                  )}
                 </div>
 
                 {/* 분석 리포트 섹션 */}
-                <button className="btn" onClick={fetchAdminStats} disabled={isAdminStatLoading} style={{ backgroundColor: '#673AB7', width: '100%', margin: 0 }}>
-                  {isAdminStatLoading ? '데이터 분석 중...' : '정밀 분석 리포트 확인 공식 📊'}
+                <button 
+                  className="btn" 
+                  onClick={fetchAdminStats} 
+                  disabled={isAdminStatLoading} 
+                  style={{ backgroundColor: '#673AB7', width: '100%', margin: '10px 0 0 0', padding: '20px' }}
+                >
+                  {isAdminStatLoading ? '데이터 집계 중...' : '전체 활동 정밀 분석 대시보드 열기 📈'}
                 </button>
               </div>
             </div>
