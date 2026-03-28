@@ -1195,11 +1195,11 @@ function App() {
                   style={{ backgroundColor: '#673AB7', width: '100%', margin: '10px 0 0 0', padding: '20px' }}
                 >
                   {isAdminStatLoading ? '데이터 집계 중...' : '전체 활동 정밀 분석 대시보드 열기 📈'}
-                </button>
             </div>
           </div>
         </div>
-      )}
+      </div>
+    )}
 
       {/* Admin Analysis Stage */}
       {stage === 'admin-analysis' && (
