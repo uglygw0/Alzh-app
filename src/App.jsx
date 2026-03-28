@@ -1196,11 +1196,8 @@ function App() {
                 >
                   {isAdminStatLoading ? '데이터 집계 중...' : '전체 활동 정밀 분석 대시보드 열기 📈'}
                 </button>
-              </div>
             </div>
           </div>
-        </div>
-      )}
         </div>
       )}
 
