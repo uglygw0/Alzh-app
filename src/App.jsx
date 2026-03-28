@@ -293,51 +293,84 @@ function App() {
     }
   };
 
+  const handleDownloadOptimizedCSV = (data, filename) => {
+    if (!data || data.length === 0) {
+      alert("다운로드할 데이터가 없습니다.");
+      return;
+    }
+
+    // 1. 모든 헤더 추출
+    const allHeaders = Object.keys(data[0]);
+
+    // 2. 모든 행에서 데이터가 하나도 없는 컬럼(헤더) 제외 (용량 최적화)
+    const activeHeaders = allHeaders.filter(header => {
+      return data.some(row => {
+        const val = row[header];
+        return val !== null && val !== undefined && val !== '' && (Array.isArray(val) ? val.length > 0 : true) && (typeof val === 'object' && !Array.isArray(val) ? Object.keys(val).length > 0 : true);
+      });
+    });
+
+    const csvRows = [];
+    csvRows.push(activeHeaders.join(','));
+
+    for (const row of data) {
+      const values = activeHeaders.map(header => {
+        const val = row[header];
+        if (val === null || val === undefined) return '';
+        if (typeof val === 'object') {
+          const stringVal = JSON.stringify(val).replace(/"/g, '""');
+          return `"${stringVal}"`;
+        }
+        if (typeof val === 'string' && (val.includes(',') || val.includes('\n'))) {
+          return `"${val}"`;
+        }
+        return val;
+      });
+      csvRows.push(values.join(','));
+    }
+
+    const csvContent = "\uFEFF" + csvRows.join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.setAttribute("href", url);
+    link.setAttribute("download", filename);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   const handleDownloadCSV = async () => {
     setIsDownloading(true);
     try {
       const { data, error } = await supabase.from('test_results').select('*');
       if (error) throw error;
+      handleDownloadOptimizedCSV(data, `test_results_all_${new Date().toISOString().split('T')[0]}.csv`);
+    } catch (err) {
+      console.error(err);
+      alert("데이터를 가져오는 중 오류가 발생했습니다.");
+    } finally {
+      setIsDownloading(false);
+    }
+  };
 
+  const handleDownloadUglygw0Results = async () => {
+    setIsDownloading(true);
+    try {
+      // uglygw0 회원의 결과만 가져오기
+      const { data, error } = await supabase
+        .from('member_test_results')
+        .select('*')
+        .eq('member_id', 'uglygw0');
+      
+      if (error) throw error;
+      
       if (!data || data.length === 0) {
-        alert("아직 누적된 데이터가 없습니다.");
-        setIsDownloading(false);
+        alert("uglygw0 회원의 데이터가 아직 없습니다.");
         return;
       }
 
-      // 1. 헤더 추출
-      const headers = Object.keys(data[0]);
-      const csvRows = [];
-
-      csvRows.push(headers.join(',')); // 헤더 행 추가
-
-      // 2. 데이터 추출 및 CSV 형식 변환
-      for (const row of data) {
-        const values = headers.map(header => {
-          const val = row[header];
-          if (val === null || val === undefined) return '';
-          if (typeof val === 'object') {
-            const stringVal = JSON.stringify(val).replace(/"/g, '""');
-            return `"${stringVal}"`;
-          }
-          if (typeof val === 'string' && (val.includes(',') || val.includes('\n'))) {
-            return `"${val}"`;
-          }
-          return val;
-        });
-        csvRows.push(values.join(','));
-      }
-
-      // 우회전 시 엑셀에서 한글이 깨지지 않게 BOM(FEFF) 추가
-      const csvContent = "\uFEFF" + csvRows.join('\n');
-      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.setAttribute("href", url);
-      link.setAttribute("download", `test_results_${new Date().toISOString().split('T')[0]}.csv`);
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
+      handleDownloadOptimizedCSV(data, `test_results_uglygw0_${new Date().toISOString().split('T')[0]}.csv`);
     } catch (err) {
       console.error(err);
       alert("데이터를 가져오는 중 오류가 발생했습니다.");
@@ -1091,12 +1124,17 @@ function App() {
               <p style={{ color: 'var(--text-dark)', marginBottom: '40px', fontSize: '20px' }}>
                 현재까지 누적된 어르신들의 <strong>두뇌 활동 데이터</strong>를 엑셀(CSV) 파일 형식으로 즉시 다운로드하실 수 있습니다.
               </p>
-              <button className="btn" onClick={handleDownloadCSV} disabled={isDownloading}>
-                {isDownloading ? '데이터 생성 중...' : '결과 다운로드 (CSV) 📥'}
-              </button>
-              <button className="btn" onClick={fetchAdminStats} disabled={isAdminStatLoading} style={{ marginTop: '15px', backgroundColor: '#673AB7' }}>
-                {isAdminStatLoading ? '분석 중...' : '정밀 분석 리포트 보기 📊'}
-              </button>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                <button className="btn" onClick={handleDownloadCSV} disabled={isDownloading}>
+                  {isDownloading ? '데이터 생성 중...' : '전체 결과 다운로드 (CSV) 📥'}
+                </button>
+                <button className="btn" onClick={handleDownloadUglygw0Results} disabled={isDownloading} style={{ backgroundColor: '#2E7D32' }}>
+                  {isDownloading ? '데이터 생성 중...' : '회원(uglygw0) 결과 다운로드 📥'}
+                </button>
+                <button className="btn" onClick={fetchAdminStats} disabled={isAdminStatLoading} style={{ backgroundColor: '#673AB7' }}>
+                  {isAdminStatLoading ? '분석 중...' : '정밀 분석 리포트 보기 📊'}
+                </button>
+              </div>
             </div>
           </div>
         </div>
