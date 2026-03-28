@@ -116,6 +116,8 @@ function App() {
   const [adminStats, setAdminStats] = useState(null);
   const [isAdminStatLoading, setIsAdminStatLoading] = useState(false);
   const [analysisPeriod, setAnalysisPeriod] = useState('week'); // 'day', 'week', 'month'
+  const [memberList, setMemberList] = useState([]);
+  const [selectedMember, setSelectedMember] = useState('');
 
   // Member States
   const [loggedInMember, setLoggedInMember] = useState(null);
@@ -256,9 +258,26 @@ function App() {
     setAdminPassword('');
   };
 
+  const fetchMemberList = async () => {
+    try {
+      const { data, error } = await supabase.from('member_test_results').select('member_id');
+      if (error) throw error;
+      const uniqueIds = Array.from(new Set(data.map(item => item.member_id))).filter(Boolean);
+      setMemberList(uniqueIds);
+      if (uniqueIds.includes('uglygw0')) {
+        setSelectedMember('uglygw0');
+      } else if (uniqueIds.length > 0) {
+        setSelectedMember(uniqueIds[0]);
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
   const handleAdminSubmit = () => {
     if (adminPassword.toLowerCase() === 'ideas6') {
       setStage('admin');
+      fetchMemberList();
     } else {
       alert("비밀번호가 일치하지 않습니다.");
       setAdminPassword('');
@@ -326,23 +345,20 @@ function App() {
     }
   };
 
-  const handleDownloadUglygw0Results = async () => {
+  const handleDownloadSelectedMemberResults = async () => {
+    if (!selectedMember) {
+      alert("다운로드할 회원을 선택해주세요.");
+      return;
+    }
     setIsDownloading(true);
     try {
-      // uglygw0 회원의 결과만 가져오기
-      const { data, error } = await supabase
-        .from('member_test_results')
-        .select('*')
-        .eq('member_id', 'uglygw0');
-      
+      const { data, error } = await supabase.from('member_test_results').select('*').eq('member_id', selectedMember);
       if (error) throw error;
-      
       if (!data || data.length === 0) {
-        alert("uglygw0 회원의 데이터가 아직 없습니다.");
+        alert("해당 회원의 데이터가 없습니다.");
         return;
       }
-
-      handleDownloadOptimizedCSV(data, `test_results_uglygw0_${new Date().toISOString().split('T')[0]}.csv`);
+      handleDownloadOptimizedCSV(data, `test_results_${selectedMember}_${new Date().toISOString().split('T')[0]}.csv`);
     } catch (err) {
       console.error(err);
       alert("데이터를 가져오는 중 오류가 발생했습니다.");
@@ -1090,21 +1106,51 @@ function App() {
             <button className="back-btn" onClick={() => setStage('home')}>← 처음으로</button>
           </div>
           <div className="center-content" style={{ flex: 1, justifyContent: 'center' }}>
-            <div className="solid-card" style={{ maxWidth: '450px', width: '100%', margin: '0 auto', textAlign: 'center' }}>
+            <div className="solid-card" style={{ maxWidth: '500px', width: '100%', margin: '0 auto', textAlign: 'center' }}>
               <div className="header-icon" style={{ fontSize: '50px', width: '80px', height: '80px', background: '#E3F2FD', color: '#1976D2', borderColor: '#1976D2' }}>📊</div>
-              <h2>활동 데이터 분석</h2>
-              <p style={{ color: 'var(--text-dark)', marginBottom: '40px', fontSize: '20px' }}>
-                현재까지 누적된 어르신들의 <strong>두뇌 활동 데이터</strong>를 엑셀(CSV) 파일 형식으로 즉시 다운로드하실 수 있습니다.
+              <h2>데이터 관리 및 분석</h2>
+              <p style={{ color: 'var(--text-dark)', marginBottom: '30px', fontSize: '18px' }}>
+                축적된 활동 데이터를 다운로드하거나<br />정밀적인 패턴 분석 리포트를 확인합니다.
               </p>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                <button className="btn" onClick={handleDownloadCSV} disabled={isDownloading}>
-                  {isDownloading ? '데이터 생성 중...' : '전체 결과 다운로드 (CSV) 📥'}
-                </button>
-                <button className="btn" onClick={handleDownloadUglygw0Results} disabled={isDownloading} style={{ backgroundColor: '#2E7D32' }}>
-                  {isDownloading ? '데이터 생성 중...' : '회원(uglygw0) 결과 다운로드 📥'}
-                </button>
-                <button className="btn" onClick={fetchAdminStats} disabled={isAdminStatLoading} style={{ backgroundColor: '#673AB7' }}>
-                  {isAdminStatLoading ? '분석 중...' : '정밀 분석 리포트 보기 📊'}
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '25px' }}>
+                {/* 전체 다운로드 섹션 */}
+                <div style={{ backgroundColor: '#f8f9fa', padding: '15px', borderRadius: '12px', border: '1px solid #eee' }}>
+                  <p style={{ margin: '0 0 10px 0', fontWeight: 'bold', fontSize: '16px', color: '#666' }}>전체 사용자 데이터</p>
+                  <button className="btn" onClick={handleDownloadCSV} disabled={isDownloading} style={{ margin: 0, width: '100%' }}>
+                    {isDownloading ? '다운로드 중...' : '전체 결과 다운로드 (CSV) 📥'}
+                  </button>
+                </div>
+
+                {/* 회원 선택 다운로드 섹션 */}
+                <div style={{ backgroundColor: '#f1f8e9', padding: '15px', borderRadius: '12px', border: '1px solid #c8e6c9' }}>
+                  <p style={{ margin: '0 0 10px 0', fontWeight: 'bold', fontSize: '16px', color: '#2E7D32' }}>회원별 선택 다운로드</p>
+                  <div style={{ display: 'flex', gap: '10px', marginBottom: '10px' }}>
+                    <select 
+                      className="large-select" 
+                      style={{ margin: 0, flex: 1, height: '54px', fontSize: '18px' }}
+                      value={selectedMember}
+                      onChange={(e) => setSelectedMember(e.target.value)}
+                    >
+                      <option value="">-- 회원 선택 --</option>
+                      {memberList.map(mid => (
+                        <option key={mid} value={mid}>{mid}</option>
+                      ))}
+                    </select>
+                    <button 
+                      className="btn" 
+                      onClick={handleDownloadSelectedMemberResults} 
+                      disabled={isDownloading || !selectedMember} 
+                      style={{ margin: 0, backgroundColor: '#4CAF50', padding: '0 20px', whiteSpace: 'nowrap' }}
+                    >
+                      ⬇️ 받기
+                    </button>
+                  </div>
+                </div>
+
+                {/* 분석 리포트 섹션 */}
+                <button className="btn" onClick={fetchAdminStats} disabled={isAdminStatLoading} style={{ backgroundColor: '#673AB7', width: '100%', margin: 0 }}>
+                  {isAdminStatLoading ? '데이터 분석 중...' : '정밀 분석 리포트 확인 공식 📊'}
                 </button>
               </div>
             </div>
