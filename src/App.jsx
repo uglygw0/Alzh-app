@@ -241,35 +241,7 @@ function App() {
         return;
       }
 
-      const headers = Object.keys(data[0]);
-      const csvRows = [];
-      csvRows.push(headers.join(','));
-
-      for (const row of data) {
-        const values = headers.map(header => {
-          const val = row[header];
-          if (val === null || val === undefined) return '';
-          if (typeof val === 'object') {
-            const stringVal = JSON.stringify(val).replace(/"/g, '""');
-            return `"${stringVal}"`;
-          }
-          if (typeof val === 'string' && (val.includes(',') || val.includes('\n'))) {
-            return `"${val}"`;
-          }
-          return val;
-        });
-        csvRows.push(values.join(','));
-      }
-
-      const csvContent = "\uFEFF" + csvRows.join('\n');
-      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.setAttribute("href", url);
-      link.setAttribute("download", `my_test_results_${loggedInMember}_${new Date().toISOString().split('T')[0]}.csv`);
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
+      handleDownloadOptimizedCSV(data, `my_test_results_${loggedInMember}_${new Date().toISOString().split('T')[0]}.csv`);
     } catch (err) {
       console.error(err);
       alert("데이터를 가져오는 중 오류가 발생했습니다.");
