@@ -123,7 +123,7 @@ function App() {
   const [loggedInMember, setLoggedInMember] = useState(null);
   const [memberLoginId, setMemberLoginId] = useState('');
   const [memberPassword, setMemberPassword] = useState('');
-  const [isMemberDownloading, setIsMemberDownloading] = useState(false);
+
 
   const setupCardLevel = (levelIndex) => {
     const images = CARD_LEVELS[levelIndex];
@@ -231,26 +231,7 @@ function App() {
     }
   };
 
-  const handleMemberDownloadCSV = async () => {
-    setIsMemberDownloading(true);
-    try {
-      const { data, error } = await supabase.from('member_test_results').select('*').eq('member_id', loggedInMember);
-      if (error) throw error;
 
-      if (!data || data.length === 0) {
-        alert("아직 누적된 내 활동 데이터가 없습니다.");
-        setIsMemberDownloading(false);
-        return;
-      }
-
-      handleDownloadOptimizedCSV(data, `my_test_results_${loggedInMember}_${new Date().toISOString().split('T')[0]}.csv`);
-    } catch (err) {
-      console.error(err);
-      alert("데이터를 가져오는 중 오류가 발생했습니다.");
-    } finally {
-      setIsMemberDownloading(false);
-    }
-  };
 
   // Admin Handlers
   const handleAdminClick = () => {
@@ -984,8 +965,8 @@ function App() {
               <div className="solid-card" style={{ width: '100%', marginBottom: '20px', padding: '20px', textAlign: 'center', backgroundColor: '#e8f5e9', borderColor: '#4CAF50' }}>
                 <p style={{ fontSize: '24px', fontWeight: 'bold', margin: '0 0 15px 0', color: '#2E7D32' }}>👤 {loggedInMember}님 환영합니다!</p>
                 <div style={{ display: 'flex', gap: '10px', justifyContent: 'center' }}>
-                  <button className="btn" onClick={handleMemberDownloadCSV} disabled={isMemberDownloading} style={{ fontSize: '18px', padding: '15px 20px', backgroundColor: '#4CAF50' }}>
-                    {isMemberDownloading ? '가져오는 중...' : '다운로드 (엑셀) 📥'}
+                  <button className="btn" onClick={fetchAdminStats} disabled={isAdminStatLoading} style={{ fontSize: '18px', padding: '15px 20px', backgroundColor: '#4CAF50' }}>
+                    {isAdminStatLoading ? '가져오는 중...' : '나의 분석 리포트 확인 📈'}
                   </button>
                   <button className="btn btn-secondary" onClick={() => setLoggedInMember(null)} style={{ fontSize: '18px', padding: '15px 20px' }}>
                     로그아웃
@@ -1206,7 +1187,7 @@ function App() {
       {stage === 'admin-analysis' && (
         <div className="fade-in" style={{ display: 'flex', flexDirection: 'column', height: '100%', paddingBottom: '40px' }}>
           <div style={{ width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
-            <button className="back-btn" onClick={() => setStage('admin')}>← 뒤로 가기</button>
+            <button className="back-btn" onClick={() => setStage(loggedInMember ? 'home' : 'admin')}>← 뒤로 가기</button>
             <h2 style={{ margin: 0, color: 'var(--primary-dark)', fontSize: '30px' }}>📊 {loggedInMember ? '나의 ' : ''}데이터 분석</h2>
           </div>
 
