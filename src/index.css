@@ -374,6 +374,13 @@ p {
   font-size: 48px;
 }
 
+.mic-btn.disabled {
+  background-color: #E0E0E0;
+  color: #888888;
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
 .mic-btn.recording {
   background-color: var(--danger);
   animation: pulse-danger 1s infinite;

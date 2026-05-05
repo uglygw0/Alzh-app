@@ -109,6 +109,21 @@ function App() {
   const [seqInput, setSeqInput] = useState('');
   const [seqAttempts, setSeqAttempts] = useState(0);
   const [seqErrors, setSeqErrors] = useState(0);
+  const [seqFirstKeyTime, setSeqFirstKeyTime] = useState(null);
+
+  // Additional Granular Metrics States
+  const [typingMetrics, setTypingMetrics] = useState({
+    keystrokeTimes: [],
+    backspaceCount: 0,
+    initialDelay: 0
+  });
+
+  const [cardMetrics, setCardMetrics] = useState({
+    seenCards: new Set(),
+    revisitCount: 0,
+    flipTimestamps: [],
+    decisionTimes: []
+  });
 
   // Admin States
   const [adminPassword, setAdminPassword] = useState('');
@@ -147,10 +162,23 @@ function App() {
   const [isRecording, setIsRecording] = useState(false);
   const [transcript, setTranscript] = useState('');
   const [voiceSupport, setVoiceSupport] = useState(true);
+  
+  // New granular voice variables
+  const [pitchData, setPitchData] = useState([]);
+  const [clarityScores, setClarityScores] = useState([]);
+  const [hesitationEvents, setHesitationEvents] = useState(0);
+  const [voiceShowingInitial, setVoiceShowingInitial] = useState(false);
+  const [lastSpeechTime, setLastSpeechTime] = useState(0);
 
   // Refs
   const inputRef = useRef(null);
   const recognitionRef = useRef(null);
+  const audioContextRef = useRef(null);
+  const analyserRef = useRef(null);
+  const streamRef = useRef(null);
+  const pitchIntervalRef = useRef(null);
+  const canvasRef = useRef(null);
+  const rafRef = useRef(null);
 
   useEffect(() => {
     // Check Speech Recognition Support
@@ -164,10 +192,27 @@ function App() {
 
         recognitionRef.current.onresult = (event) => {
           let currentTranscript = '';
+          let currentConfidence = 0;
+          let resultsCount = 0;
+
           for (let i = event.resultIndex; i < event.results.length; i++) {
             currentTranscript += event.results[i][0].transcript;
+            currentConfidence += event.results[i][0].confidence;
+            resultsCount++;
           }
+          
           setTranscript(currentTranscript);
+          if (resultsCount > 0) {
+            const avgConf = currentConfidence / resultsCount;
+            setClarityScores(prev => [...prev, avgConf]);
+          }
+
+          // Hesitation detection: check time since last result
+          const now = Date.now();
+          if (lastSpeechTime > 0 && (now - lastSpeechTime) > 1500) {
+            setHesitationEvents(prev => prev + 1);
+          }
+          setLastSpeechTime(now);
         };
 
         recognitionRef.current.onerror = (event) => {
@@ -497,6 +542,11 @@ function App() {
     setUserInput('');
     setTranscript('');
     setResults([]);
+    
+    // Reset granular metrics
+    setTypingMetrics({ keystrokeTimes: [], backspaceCount: 0, initialDelay: 0 });
+    setCardMetrics({ seenCards: new Set(), revisitCount: 0, flipTimestamps: [], decisionTimes: [] });
+    setSeqFirstKeyTime(null);
 
     if (testMode === 'card') {
       setCardLevel(0);
@@ -512,6 +562,12 @@ function App() {
         setShowingInitial(false);
         setStartTime(Date.now());
       }, 3000);
+    } else if (testMode === 'voice') {
+      setVoiceShowingInitial(true);
+      setTimeout(() => {
+        setVoiceShowingInitial(false);
+        setStartTime(Date.now());
+      }, 2000);
     } else {
       setStartTime(Date.now());
     }
@@ -619,8 +675,140 @@ function App() {
       setCurrentSentenceIndex(prev => prev + 1);
       setUserInput('');
       setStartTime(Date.now());
+      setTypingMetrics({ keystrokeTimes: [], backspaceCount: 0, initialDelay: 0 });
     } else {
       finishTest(newResults);
+    }
+  };
+
+  const handleTypingKeyDown = (e) => {
+    const now = Date.now();
+    
+    // Initial delay
+    if (userInput.length === 0 && typingMetrics.initialDelay === 0) {
+      setTypingMetrics(prev => ({ ...prev, initialDelay: (now - startTime) / 1000 }));
+    }
+
+    // Backspace count
+    if (e.key === 'Backspace') {
+      setTypingMetrics(prev => ({ ...prev, backspaceCount: prev.backspaceCount + 1 }));
+    }
+
+    // Keystroke intervals
+    setTypingMetrics(prev => ({ ...prev, keystrokeTimes: [...prev.keystrokeTimes, now] }));
+  };
+
+  // 간단한 피치 검출 알고리즘 (Autocorrelation)
+  const detectPitch = (buffer, sampleRate) => {
+    let SIZE = buffer.length;
+    let rms = 0;
+    for (let i = 0; i < SIZE; i++) {
+      rms += buffer[i] * buffer[i];
+    }
+    rms = Math.sqrt(rms / SIZE);
+    if (rms < 0.01) return null; // 소리가 너무 작으면 무시
+
+    let r1 = 0, r2 = SIZE - 1, thres = 0.2;
+    for (let i = 0; i < SIZE / 2; i++) {
+      if (Math.abs(buffer[i]) < thres) { r1 = i; break; }
+    }
+    for (let i = 1; i < SIZE / 2; i++) {
+      if (Math.abs(buffer[SIZE - i]) < thres) { r2 = SIZE - i; break; }
+    }
+    
+    let buf = buffer.slice(r1, r2);
+    SIZE = buf.length;
+    let c = new Array(SIZE).fill(0);
+    for (let i = 0; i < SIZE; i++) {
+      for (let j = 0; j < SIZE - i; j++) {
+        c[i] = c[i] + buf[j] * buf[j + i];
+      }
+    }
+
+    let d = 0; while (c[d] > c[d + 1]) d++;
+    let maxval = -1, maxpos = -1;
+    for (let i = d; i < SIZE; i++) {
+      if (c[i] > maxval) {
+        maxval = c[i];
+        maxpos = i;
+      }
+    }
+    let T0 = maxpos;
+    return sampleRate / T0;
+  };
+
+  const startAudioAnalysis = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      streamRef.current = stream;
+      
+      const AudioContext = window.AudioContext || window.webkitAudioContext;
+      const audioCtx = new AudioContext();
+      audioContextRef.current = audioCtx;
+      
+      const analyser = audioCtx.createAnalyser();
+      analyser.fftSize = 2048;
+      analyserRef.current = analyser;
+      
+      const source = audioCtx.createMediaStreamSource(stream);
+      source.connect(analyser);
+      
+      const buffer = new Float32Array(analyser.fftSize);
+      
+      const draw = () => {
+        if (!canvasRef.current || !analyserRef.current) return;
+        const canvas = canvasRef.current;
+        const ctx = canvas.getContext('2d');
+        const bufferLength = analyserRef.current.frequencyBinCount;
+        const dataArray = new Uint8Array(bufferLength);
+        
+        analyserRef.current.getByteTimeDomainData(dataArray);
+        
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.lineWidth = 4;
+        ctx.strokeStyle = '#4CAF50';
+        ctx.beginPath();
+        
+        const sliceWidth = canvas.width * 1.0 / bufferLength;
+        let x = 0;
+        
+        for (let i = 0; i < bufferLength; i++) {
+          const v = dataArray[i] / 128.0;
+          const y = v * canvas.height / 2;
+          
+          if (i === 0) ctx.moveTo(x, y);
+          else ctx.lineTo(x, y);
+          
+          x += sliceWidth;
+        }
+        
+        ctx.lineTo(canvas.width, canvas.height / 2);
+        ctx.stroke();
+        rafRef.current = requestAnimationFrame(draw);
+      };
+      
+      draw();
+
+      pitchIntervalRef.current = setInterval(() => {
+        analyser.getFloatTimeDomainData(buffer);
+        const pitch = detectPitch(buffer, audioCtx.sampleRate);
+        if (pitch && pitch > 50 && pitch < 500) { // 일반적인 목소리 범위
+          setPitchData(prev => [...prev, pitch]);
+        }
+      }, 100); // 100ms마다 피치 측정
+    } catch (err) {
+      console.error("Audio analysis failed", err);
+    }
+  };
+
+  const stopAudioAnalysis = () => {
+    if (pitchIntervalRef.current) clearInterval(pitchIntervalRef.current);
+    if (rafRef.current) cancelAnimationFrame(rafRef.current);
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach(track => track.stop());
+    }
+    if (audioContextRef.current) {
+      audioContextRef.current.close();
     }
   };
 
@@ -628,10 +816,17 @@ function App() {
   const toggleRecording = () => {
     if (isRecording) {
       recognitionRef.current.stop();
+      stopAudioAnalysis();
       setIsRecording(false);
     } else {
       setTranscript('');
+      setPitchData([]);
+      setClarityScores([]);
+      setHesitationEvents(0);
+      setLastSpeechTime(Date.now());
+      
       recognitionRef.current.start();
+      startAudioAnalysis();
       setIsRecording(true);
       if (!startTime) setStartTime(Date.now());
     }
@@ -649,16 +844,43 @@ function App() {
 
     const accuracy = calculateAccuracy(targetSentence, transcript);
 
-    const unexpectedPauses = Math.max(0, Math.floor(timeTaken / 3) - 1); // 3초당 1번 이상의 멈춤이 있으면 감점 요인으로 시뮬레이션
-    const wordRepetitions = (transcript.match(/(\b\w+\b)(?=.*\b\1\b)/gi) || []).length; // 단순 중복 단어 잡기 시뮬레이션
+    // Stuttering detection: repeated words or syllables
+    const words = transcript.split(' ');
+    let stutterCount = 0;
+    for (let i = 0; i < words.length - 1; i++) {
+      if (words[i] === words[i+1] && words[i].length > 0) stutterCount++;
+    }
+
+    // Filler words detection
+    const fillers = ['음', '어', '아', '그', '이제'];
+    let fillerCount = 0;
+    fillers.forEach(f => {
+      const regex = new RegExp(f, 'g');
+      const matches = transcript.match(regex);
+      if (matches) fillerCount += matches.length;
+    });
+
+    // Pitch variance calculation
+    let pitchVariance = 0;
+    if (pitchData.length > 1) {
+      const mean = pitchData.reduce((a, b) => a + b, 0) / pitchData.length;
+      pitchVariance = Math.sqrt(pitchData.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / pitchData.length);
+    }
+
+    // Average clarity (confidence)
+    const avgClarity = clarityScores.length > 0 
+      ? (clarityScores.reduce((a, b) => a + b, 0) / clarityScores.length) * 100 
+      : 0;
 
     const newResults = [...results, {
       target: targetSentence,
       input: transcript,
       timeTaken,
       accuracy,
-      unexpectedPauses,
-      wordRepetitions,
+      unexpectedPauses: hesitationEvents,
+      wordRepetitions: stutterCount + fillerCount,
+      pitchVariance,
+      avgClarity,
       length: targetSentence.length
     }];
     setResults(newResults);
@@ -667,6 +889,11 @@ function App() {
       setCurrentSentenceIndex(prev => prev + 1);
       setTranscript('');
       setStartTime(null);
+      setVoiceShowingInitial(true);
+      setTimeout(() => {
+        setVoiceShowingInitial(false);
+        setStartTime(Date.now());
+      }, 2000);
     } else {
       finishTest(newResults);
     }
@@ -678,6 +905,25 @@ function App() {
 
     const newFlipped = [...flippedCards, id];
     setFlippedCards(newFlipped);
+
+    // Granular Card Metrics
+    const now = Date.now();
+    setCardMetrics(prev => {
+      const isRevisit = prev.seenCards.has(id) && !matchedCards.includes(id);
+      const newSeen = new Set(prev.seenCards);
+      newSeen.add(id);
+      
+      const newDecisionTimes = prev.flipTimestamps.length > 0 
+        ? [...prev.decisionTimes, (now - prev.flipTimestamps[prev.flipTimestamps.length - 1]) / 1000]
+        : prev.decisionTimes;
+
+      return {
+        seenCards: newSeen,
+        revisitCount: isRevisit ? prev.revisitCount + 1 : prev.revisitCount,
+        flipTimestamps: [...prev.flipTimestamps, now],
+        decisionTimes: newDecisionTimes
+      };
+    });
 
     if (newFlipped.length === 2) {
       setIsInteractionDisabled(true);
@@ -720,6 +966,16 @@ function App() {
         const timeInMinutes = Math.max(0.1, totalTime / 60);
         const cpm = Math.round(estimatedStrokes / timeInMinutes);
 
+        // IKI (Inter-Keystroke Interval) Variance
+        let ikiVariance = 0;
+        const times = typingMetrics.keystrokeTimes;
+        if (times.length > 1) {
+          const intervals = [];
+          for (let i = 1; i < times.length; i++) intervals.push(times[i] - times[i-1]);
+          const mean = intervals.reduce((a, b) => a + b, 0) / intervals.length;
+          ikiVariance = Math.sqrt(intervals.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / intervals.length);
+        }
+
         const speedScore = Math.min(100, (cpm / 120) * 100);
         let comprehensiveScore = Math.round((accuracy * 0.7) + (speedScore * 0.3));
 
@@ -737,7 +993,14 @@ function App() {
           raw_errors: totalErrors,
           consistency: consistency,
           learning_effect: learningEffect,
-          details: { estimatedStrokes, cpm, accuracy: parseFloat(accuracy.toFixed(1)) }
+          details: { 
+            estimatedStrokes, 
+            cpm, 
+            accuracy: parseFloat(accuracy.toFixed(1)),
+            iki_variance: parseFloat(ikiVariance.toFixed(2)),
+            backspace_count: typingMetrics.backspaceCount,
+            initial_delay: parseFloat(typingMetrics.initialDelay.toFixed(2))
+          }
         };
         await supabase.from('test_results').insert([commonData]);
 
@@ -759,7 +1022,12 @@ function App() {
         });
 
         const avgAccuracy = totalAccuracy / finalResults.length;
-        let comprehensiveScore = Math.round(avgAccuracy - (totalPauses * 5) - (totalRepeats * 5));
+        const avgPitchVariance = finalResults.reduce((sum, r) => sum + (r.pitchVariance || 0), 0) / finalResults.length;
+        const avgClarity = finalResults.reduce((sum, r) => sum + (r.avgClarity || 0), 0) / finalResults.length;
+
+        let comprehensiveScore = Math.round(avgAccuracy - (totalPauses * 3) - (totalRepeats * 2));
+        if (avgPitchVariance < 10) comprehensiveScore -= 5; // 너무 단조로운 목소리 감점
+        if (avgClarity < 70) comprehensiveScore -= 5; // 낮은 선명도 감점
 
         const normalizedScore = Math.max(0, Math.min(100, comprehensiveScore));
         const consistency = getConsistency(normalizedTimes);
@@ -775,7 +1043,14 @@ function App() {
           raw_errors: totalPauses + totalRepeats,
           consistency: consistency,
           learning_effect: learningEffect,
-          details: { unexpectedPauses: totalPauses, wordRepetitions: totalRepeats, accuracy: parseFloat(avgAccuracy.toFixed(1)) }
+          details: { 
+            unexpectedPauses: totalPauses, 
+            wordRepetitions: totalRepeats, 
+            accuracy: parseFloat(avgAccuracy.toFixed(1)),
+            pitch_variance: parseFloat(avgPitchVariance.toFixed(2)),
+            clarity_score: parseFloat(avgClarity.toFixed(1)),
+            hesitation_count: totalPauses
+          }
         };
         await supabase.from('test_results').insert([commonData]);
 
@@ -797,6 +1072,10 @@ function App() {
         let score = 100 - (totalErrors * 5);
         if (totalTime > 60) score -= (totalTime - 60) * 0.5;
 
+        const avgDecisionTime = cardMetrics.decisionTimes.length > 0
+          ? cardMetrics.decisionTimes.reduce((a, b) => a + b, 0) / cardMetrics.decisionTimes.length
+          : 0;
+
         const normalizedScore = Math.max(0, Math.min(100, Math.round(score + 10)));
         const consistency = getConsistency(normalizedTimes);
         const learningEffect = getLearningEffect(normalizedTimes);
@@ -811,7 +1090,11 @@ function App() {
           raw_errors: totalErrors,
           consistency: consistency,
           learning_effect: learningEffect,
-          details: { attempts: totalAttempts }
+          details: { 
+            attempts: totalAttempts,
+            revisit_count: cardMetrics.revisitCount,
+            avg_decision_time: parseFloat(avgDecisionTime.toFixed(2))
+          }
         };
         await supabase.from('test_results').insert([commonData]);
 
@@ -846,7 +1129,10 @@ function App() {
           raw_errors: totalErrors,
           consistency: consistency,
           learning_effect: learningEffect,
-          details: { attempts: finalResults.reduce((sum, r) => sum + r.attempts, 0) }
+          details: { 
+            attempts: finalResults.reduce((sum, r) => sum + r.attempts, 0),
+            first_char_delay: seqFirstKeyTime ? parseFloat(((seqFirstKeyTime - startTime) / 1000).toFixed(2)) : 0
+          }
         };
         await supabase.from('test_results').insert([commonData]);
 
@@ -1454,6 +1740,7 @@ function App() {
             className="typing-input"
             value={userInput}
             onChange={(e) => setUserInput(e.target.value)}
+            onKeyDown={handleTypingKeyDown}
             placeholder="이곳을 눌러 글을 써주세요"
             spellCheck={false}
           />
@@ -1474,23 +1761,45 @@ function App() {
             <span className="progress-text">현재 단계 : {currentSentenceIndex + 1} / {VOICE_SENTENCES.length}</span>
           </div>
 
-          <h2 style={{ marginBottom: '20px', textAlign: 'center', fontSize: '32px' }}>네모 안의 글자를 읽어주세요</h2>
+          <h2 style={{ marginBottom: '20px', textAlign: 'center', fontSize: '32px' }}>문장을 기억해서 말씀해 주세요</h2>
 
-          <div className="sentence-container" style={{ padding: '40px 24px' }}>
+          <div className="sentence-container" style={{ padding: '40px 24px', minHeight: '160px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <div className="target-sentence" style={{ fontSize: '36px', color: 'var(--primary-dark)' }}>
-              {VOICE_SENTENCES[currentSentenceIndex]}
+              {voiceShowingInitial ? (
+                VOICE_SENTENCES[currentSentenceIndex]
+              ) : (
+                <div style={{ fontSize: '60px', color: '#DDDDDD' }}>❓</div>
+              )}
             </div>
           </div>
 
-          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', position: 'relative' }}>
+            {isRecording && (
+              <canvas 
+                ref={canvasRef} 
+                width="300" 
+                height="100" 
+                style={{ 
+                  position: 'absolute', 
+                  top: '-40px', 
+                  borderRadius: '10px',
+                  opacity: 0.6
+                }} 
+              />
+            )}
             <button
-              className={`mic-btn ${isRecording ? 'recording' : ''}`}
+              className={`mic-btn ${isRecording ? 'recording' : ''} ${voiceShowingInitial ? 'disabled' : ''}`}
               onClick={toggleRecording}
+              disabled={voiceShowingInitial}
             >
               <span>{isRecording ? '⏹️' : '🎙️'}</span>
             </button>
             <p style={{ marginTop: '20px', fontWeight: '800', fontSize: '24px', color: isRecording ? 'var(--danger)' : 'var(--text-muted)', textAlign: 'center', wordBreak: 'keep-all' }}>
-              {isRecording ? '듣고 있습니다...\n말씀을 시작해 주세요' : '마이크 모양을 누르면\n녹음이 시작됩니다'}
+              {voiceShowingInitial 
+                ? '문장을 잘 기억해 주세요...' 
+                : isRecording 
+                  ? '듣고 있습니다...\n기억하신 문장을 말씀해 주세요' 
+                  : '마이크 모양을 누르고\n기억하신 문장을 말씀해 주세요'}
             </p>
 
             {transcript && (
@@ -1501,7 +1810,7 @@ function App() {
             )}
           </div>
 
-          <button className="btn" onClick={handleVoiceNext} disabled={!transcript && !isRecording && currentSentenceIndex === 0}>
+          <button className="btn" onClick={handleVoiceNext} disabled={voiceShowingInitial || (!transcript && !isRecording && currentSentenceIndex === 0)}>
             {currentSentenceIndex === VOICE_SENTENCES.length - 1 ? '완료하기' : '다 읽었습니다 (다음으로)'}
           </button>
         </div>
@@ -1624,7 +1933,10 @@ function App() {
                 className="typing-input"
                 style={{ marginBottom: '15px' }}
                 value={seqInput}
-                onChange={(e) => setSeqInput(e.target.value)}
+                onChange={(e) => {
+                  if (!seqFirstKeyTime) setSeqFirstKeyTime(Date.now());
+                  setSeqInput(e.target.value);
+                }}
                 placeholder="이곳을 눌러 정답을 쓰세요"
                 spellCheck={false}
                 autoFocus
